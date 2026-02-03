@@ -49,6 +49,16 @@ CONTENT_TYPE_NAMES: dict[str, str] = {
 
 
 @dataclass
+class Mention:
+    """Represents a Signal message mention (@someone)."""
+
+    start: int  # Character position in the text
+    length: int  # Length of the placeholder (usually 1)
+    name: str  # Display name of the mentioned person
+    uuid: Optional[str] = None
+
+
+@dataclass
 class Attachment:
     """Represents a Signal message attachment."""
 
@@ -156,24 +166,66 @@ def format_sticker() -> str:
     return "[Sticker]"
 
 
-def process_signal_to_game(text: str, attachments: Optional[list[Attachment]] = None, has_sticker: bool = False) -> str:
+# Unicode Object Replacement Character - used by Signal as placeholder for mentions
+MENTION_PLACEHOLDER = "\ufffc"
+
+
+def replace_mentions(text: str, mentions: list[Mention]) -> str:
+    """Replace mention placeholder characters with @Name.
+
+    Signal uses U+FFFC (Object Replacement Character) as a placeholder
+    for mentions in the message text. This function replaces those
+    placeholders with readable @Name format.
+
+    Args:
+        text: The message text with placeholder characters
+        mentions: List of mentions with position and name info
+
+    Returns:
+        Text with mentions replaced by @Name
+    """
+    if not text or not mentions:
+        return text
+
+    # Sort mentions by start position in reverse order
+    # so replacing doesn't affect subsequent indices
+    sorted_mentions = sorted(mentions, key=lambda m: m.start, reverse=True)
+
+    result = text
+    for mention in sorted_mentions:
+        # Replace the placeholder character(s) with @Name
+        start = mention.start
+        end = start + mention.length
+        result = result[:start] + f"@{mention.name}" + result[end:]
+
+    return result
+
+
+def process_signal_to_game(
+    text: str,
+    attachments: Optional[list[Attachment]] = None,
+    has_sticker: bool = False,
+    mentions: Optional[list[Mention]] = None,
+) -> str:
     """Process a Signal message for sending to the game.
 
-    Converts emojis to shortcodes and appends attachment indicators.
+    Converts emojis to shortcodes, replaces mentions, and appends attachment indicators.
 
     Args:
         text: The message text (may be empty)
         attachments: List of attachments (may be None or empty)
         has_sticker: Whether a sticker was included
+        mentions: List of mentions (may be None or empty)
 
     Returns:
         Processed text suitable for game chat
     """
     parts = []
 
-    # Convert emojis in text
+    # Process text: replace mentions, then convert emojis
     if text:
-        parts.append(emoji_to_shortcode(text))
+        processed_text = replace_mentions(text, mentions or [])
+        parts.append(emoji_to_shortcode(processed_text))
 
     # Add sticker indicator
     if has_sticker:
@@ -221,3 +273,25 @@ def parse_attachments(raw_attachments: list[dict]) -> list[Attachment]:
             id=raw.get("id"),
         ))
     return attachments
+
+
+def parse_mentions(raw_mentions: list[dict]) -> list[Mention]:
+    """Parse raw mention data from Signal API.
+
+    Args:
+        raw_mentions: List of mention dictionaries from Signal API
+
+    Returns:
+        List of Mention objects
+    """
+    mentions = []
+    for raw in raw_mentions:
+        # Get name, falling back to number if name not available
+        name = raw.get("name") or raw.get("number") or "Unknown"
+        mentions.append(Mention(
+            start=raw.get("start", 0),
+            length=raw.get("length", 1),
+            name=name,
+            uuid=raw.get("uuid"),
+        ))
+    return mentions
