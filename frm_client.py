@@ -278,12 +278,14 @@ class FRMClient:
 
         trains = []
         for t in data:
-            trains.append({
-                "name": t.get("Name", "Train"),
-                "speed": t.get("ForwardSpeed", 0),
-                "status": t.get("Status", "Unknown"),
-                "power": t.get("PowerConsumed", 0),
-            })
+            trains.append(
+                {
+                    "name": t.get("Name", "Train"),
+                    "speed": t.get("ForwardSpeed", 0),
+                    "status": t.get("Status", "Unknown"),
+                    "power": t.get("PowerConsumed", 0),
+                }
+            )
         return trains
 
     async def get_drones(self) -> list[dict]:
@@ -294,30 +296,40 @@ class FRMClient:
 
         drones = []
         for d in data:
-            drones.append({
-                "home": d.get("HomeStation", "Unknown"),
-                "destination": d.get("PairedStation", "Unknown"),
-                "status": d.get("CurrentFlyingMode", "Unknown"),
-                "speed": d.get("FlyingSpeed", 0),
-            })
+            drones.append(
+                {
+                    "home": d.get("HomeStation", "Unknown"),
+                    "destination": d.get("PairedStation", "Unknown"),
+                    "status": d.get("CurrentFlyingMode", "Unknown"),
+                    "speed": d.get("FlyingSpeed", 0),
+                }
+            )
         return drones
 
     async def get_vehicles(self) -> list[dict]:
         """Get all vehicle information (trucks, tractors, explorers)."""
         vehicles = []
 
-        for endpoint, vtype in [("getTruck", "Truck"), ("getTractor", "Tractor"), ("getExplorer", "Explorer")]:
+        for endpoint, vtype in [
+            ("getTruck", "Truck"),
+            ("getTractor", "Tractor"),
+            ("getExplorer", "Explorer"),
+        ]:
             data = await self._get(endpoint)
             if data:
                 for v in data:
-                    vehicles.append({
-                        "type": vtype,
-                        "name": v.get("Name", vtype),
-                        "speed": v.get("ForwardSpeed", 0),
-                        "gear": v.get("CurrentGear", 0),
-                        "autopilot": v.get("AutoPilot", False),
-                        "fuel_pct": v.get("FuelInventory", {}).get("PercentFull", 0) if isinstance(v.get("FuelInventory"), dict) else 0,
-                    })
+                    vehicles.append(
+                        {
+                            "type": vtype,
+                            "name": v.get("Name", vtype),
+                            "speed": v.get("ForwardSpeed", 0),
+                            "gear": v.get("CurrentGear", 0),
+                            "autopilot": v.get("AutoPilot", False),
+                            "fuel_pct": v.get("FuelInventory", {}).get("PercentFull", 0)
+                            if isinstance(v.get("FuelInventory"), dict)
+                            else 0,
+                        }
+                    )
         return vehicles
 
     async def get_generators(self) -> dict:
@@ -381,12 +393,14 @@ class FRMClient:
             prod = item.get("CurrentProd", 0)
             cons = item.get("CurrentConsumed", 0)
             if prod > 0 or cons > 0:
-                stats.append({
-                    "name": item.get("Name", "Unknown"),
-                    "prod": prod,
-                    "cons": cons,
-                    "net": prod - cons,
-                })
+                stats.append(
+                    {
+                        "name": item.get("Name", "Unknown"),
+                        "prod": prod,
+                        "cons": cons,
+                        "net": prod - cons,
+                    }
+                )
 
         # Sort by net production
         return sorted(stats, key=lambda x: x["net"], reverse=True)
@@ -414,10 +428,12 @@ class FRMClient:
 
         switches = []
         for s in data:
-            switches.append({
-                "name": s.get("Name", "Switch"),
-                "is_on": s.get("IsOn", False),
-            })
+            switches.append(
+                {
+                    "name": s.get("Name", "Switch"),
+                    "is_on": s.get("IsOn", False),
+                }
+            )
         return switches
 
     async def health_check(self) -> bool:

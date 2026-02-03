@@ -132,9 +132,11 @@ class ServerAPIClient:
         # Parse the FG.* keys into readable format
         return {
             "auto_pause": options.get("FG.DSAutoPause", "False") == "True",
-            "autosave_on_disconnect": options.get("FG.DSAutoSaveOnDisconnect", "False") == "True",
+            "autosave_on_disconnect": options.get("FG.DSAutoSaveOnDisconnect", "False")
+            == "True",
             "autosave_interval": int(float(options.get("FG.AutosaveInterval", "300"))),
-            "seasonal_events": options.get("FG.DisableSeasonalEvents", "True") != "True",
+            "seasonal_events": options.get("FG.DisableSeasonalEvents", "True")
+            != "True",
             "network_quality": int(options.get("FG.NetworkQuality", "3")),
             "send_gameplay_data": options.get("FG.SendGameplayData", "False") == "True",
         }
@@ -151,16 +153,28 @@ class ServerAPIClient:
         # Parse settings into readable format
         return {
             "creative_mode": creative,
-            "no_arachnids": settings.get("FG.GameRules.DisableArachnidCreatures", "False") == "True",
+            "no_arachnids": settings.get(
+                "FG.GameRules.DisableArachnidCreatures", "False"
+            )
+            == "True",
             "flight_mode": settings.get("FG.PlayerRules.FlightMode", "False") == "True",
             "god_mode": settings.get("FG.PlayerRules.GodMode", "False") == "True",
-            "no_build_cost": settings.get("FG.PlayerRules.NoBuildCost", "False") == "True",
+            "no_build_cost": settings.get("FG.PlayerRules.NoBuildCost", "False")
+            == "True",
             "no_fuel_cost": settings.get("FG.GameRules.NoFuelCost", "False") == "True",
             "no_power": settings.get("FG.GameRules.NoPower", "False") == "True",
-            "no_unlock_cost": settings.get("FG.GameRules.NoUnlockCost", "False") == "True",
-            "all_tiers_unlocked": settings.get("FG.GameRules.GiveAllTiers", "False") == "True",
-            "all_schematics_unlocked": settings.get("FG.GameRules.UnlockAllResearchSchematics", "False") == "True",
-            "all_alt_recipes": settings.get("FG.GameRules.UnlockInstantAltRecipes", "False") == "True",
+            "no_unlock_cost": settings.get("FG.GameRules.NoUnlockCost", "False")
+            == "True",
+            "all_tiers_unlocked": settings.get("FG.GameRules.GiveAllTiers", "False")
+            == "True",
+            "all_schematics_unlocked": settings.get(
+                "FG.GameRules.UnlockAllResearchSchematics", "False"
+            )
+            == "True",
+            "all_alt_recipes": settings.get(
+                "FG.GameRules.UnlockInstantAltRecipes", "False"
+            )
+            == "True",
         }
 
     async def get_saves(self, limit: int = 5) -> list[dict]:
@@ -180,14 +194,16 @@ class ServerAPIClient:
             is_current = i == current_idx
 
             for header in session.get("saveHeaders", [])[:limit]:
-                saves.append({
-                    "name": header.get("saveName", "Unknown"),
-                    "session": session_name,
-                    "is_current_session": is_current,
-                    "playtime_seconds": header.get("playDurationSeconds", 0),
-                    "save_time": header.get("saveDateTime", ""),
-                    "is_modded": header.get("isModdedSave", False),
-                })
+                saves.append(
+                    {
+                        "name": header.get("saveName", "Unknown"),
+                        "session": session_name,
+                        "is_current_session": is_current,
+                        "playtime_seconds": header.get("playDurationSeconds", 0),
+                        "save_time": header.get("saveDateTime", ""),
+                        "is_modded": header.get("isModdedSave", False),
+                    }
+                )
 
             if len(saves) >= limit:
                 break

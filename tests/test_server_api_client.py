@@ -60,7 +60,9 @@ class TestServerAPIClientCall:
         mock_response.json = AsyncMock(return_value={"data": {"result": "success"}})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client._call("TestFunction")
 
@@ -75,7 +77,9 @@ class TestServerAPIClientCall:
         mock_response.json = AsyncMock(return_value={"data": {}})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         await client._call("TestFunction", data={"key": "value"})
 
@@ -100,7 +104,7 @@ class TestServerAPIClientGetSessionInfo:
         """Test successful session info retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {
                 "serverGameState": {
                     "activeSessionName": "Test Session",
@@ -128,7 +132,7 @@ class TestServerAPIClientGetSessionInfo:
         """Test session info retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = None
 
             info = await client.get_session_info()
@@ -157,7 +161,9 @@ class TestServerAPIClientParseGamePhase:
         """Test Phase 3 parsing."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        result = client._parse_game_phase("/Game/FactoryGame/GamePhases/GP_Project_Assembly_Phase_3.GP_Project_Assembly_Phase_3")
+        result = client._parse_game_phase(
+            "/Game/FactoryGame/GamePhases/GP_Project_Assembly_Phase_3.GP_Project_Assembly_Phase_3"
+        )
         assert result == "Phase 3 (2/3 deliveries)"
 
     def test_parse_phase_4(self):
@@ -202,7 +208,7 @@ class TestServerAPIClientGetServerOptions:
         """Test successful server options retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {
                 "serverOptions": {
                     "FG.DSAutoPause": "True",
@@ -227,7 +233,7 @@ class TestServerAPIClientGetServerOptions:
         """Test server options retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = None
 
             options = await client.get_server_options()
@@ -242,7 +248,7 @@ class TestServerAPIClientGetAdvancedSettings:
         """Test successful advanced settings retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {
                 "creativeModeEnabled": True,
                 "advancedGameSettings": {
@@ -256,7 +262,7 @@ class TestServerAPIClientGetAdvancedSettings:
                     "FG.GameRules.GiveAllTiers": "False",
                     "FG.GameRules.UnlockAllResearchSchematics": "False",
                     "FG.GameRules.UnlockInstantAltRecipes": "False",
-                }
+                },
             }
 
             settings = await client.get_advanced_settings()
@@ -271,7 +277,7 @@ class TestServerAPIClientGetAdvancedSettings:
         """Test advanced settings retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = None
 
             settings = await client.get_advanced_settings()
@@ -286,7 +292,7 @@ class TestServerAPIClientGetSaves:
         """Test successful saves retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {
                 "currentSessionIndex": 0,
                 "sessions": [
@@ -315,14 +321,19 @@ class TestServerAPIClientGetSaves:
         """Test saves retrieval respects limit parameter."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {
                 "currentSessionIndex": 0,
                 "sessions": [
                     {
                         "sessionName": "Session1",
                         "saveHeaders": [
-                            {"saveName": f"Save{i}", "playDurationSeconds": 3600, "saveDateTime": "", "isModdedSave": False}
+                            {
+                                "saveName": f"Save{i}",
+                                "playDurationSeconds": 3600,
+                                "saveDateTime": "",
+                                "isModdedSave": False,
+                            }
                             for i in range(10)
                         ],
                     },
@@ -337,7 +348,7 @@ class TestServerAPIClientGetSaves:
         """Test saves retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        with patch.object(client, '_call', new_callable=AsyncMock) as mock_call:
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = None
 
             saves = await client.get_saves()
@@ -364,7 +375,9 @@ class TestServerAPIClientHealthCheck:
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"data": {"health": "healthy"}})
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.health_check()
 
@@ -379,7 +392,9 @@ class TestServerAPIClientHealthCheck:
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"data": {"health": "unhealthy"}})
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.health_check()
 
@@ -393,7 +408,9 @@ class TestServerAPIClientHealthCheck:
         mock_response = AsyncMock()
         mock_response.status = 500
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.health_check()
 

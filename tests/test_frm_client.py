@@ -91,7 +91,9 @@ class TestFRMClientGet:
         mock_response.json = AsyncMock(return_value={"data": "test"})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.get = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.get = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client._get("testEndpoint")
 
@@ -104,9 +106,11 @@ class TestFRMClientGet:
         client._session = mock_session
         client._is_online = True
 
-        mock_session.get = MagicMock(side_effect=aiohttp.ClientConnectorError(
-            MagicMock(), OSError("Connection refused")
-        ))
+        mock_session.get = MagicMock(
+            side_effect=aiohttp.ClientConnectorError(
+                MagicMock(), OSError("Connection refused")
+            )
+        )
 
         result = await client._get("testEndpoint")
 
@@ -149,7 +153,7 @@ class TestFRMClientGetChatMessages:
         """Test successful chat message retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {
                     "TimeStamp": 1234567890,
@@ -172,10 +176,22 @@ class TestFRMClientGetChatMessages:
         client = FRMClient("http://localhost:8082", "token")
         client.last_timestamp = 50.0
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
-                {"TimeStamp": 1, "ServerTimeStamp": 30.0, "Sender": "Old", "Type": "Player", "Message": "Old"},
-                {"TimeStamp": 2, "ServerTimeStamp": 60.0, "Sender": "New", "Type": "Player", "Message": "New"},
+                {
+                    "TimeStamp": 1,
+                    "ServerTimeStamp": 30.0,
+                    "Sender": "Old",
+                    "Type": "Player",
+                    "Message": "Old",
+                },
+                {
+                    "TimeStamp": 2,
+                    "ServerTimeStamp": 60.0,
+                    "Sender": "New",
+                    "Type": "Player",
+                    "Message": "New",
+                },
             ]
 
             messages = await client.get_chat_messages()
@@ -187,7 +203,7 @@ class TestFRMClientGetChatMessages:
         """Test empty response handling."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = []
 
             messages = await client.get_chat_messages()
@@ -198,7 +214,7 @@ class TestFRMClientGetChatMessages:
         """Test handling when server is offline."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = None
 
             messages = await client.get_chat_messages()
@@ -225,7 +241,9 @@ class TestFRMClientSendChatMessage:
         mock_response.json = AsyncMock(return_value=[{"IsSent": True}])
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_chat_message("Hello!")
 
@@ -240,7 +258,9 @@ class TestFRMClientSendChatMessage:
         mock_response.json = AsyncMock(return_value=[{"IsSent": True}])
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_chat_message("Hello!", sender="CustomSender")
 
@@ -255,7 +275,9 @@ class TestFRMClientSendChatMessage:
         mock_response.json = AsyncMock(return_value=[{"IsSent": False}])
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_chat_message("Hello!")
 
@@ -280,7 +302,7 @@ class TestFRMClientGetPlayers:
         """Test successful player retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"Name": "Player1", "Id": "id1", "PingMs": 50, "Online": True},
                 {"Name": "Player2", "Id": "id2", "PingMs": 100, "Online": True},
@@ -296,7 +318,7 @@ class TestFRMClientGetPlayers:
         """Test offline players are filtered."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"Name": "Online", "Id": "id1", "PingMs": 50, "Online": True},
                 {"Name": "Offline", "Id": "id2", "PingMs": 0, "Online": False},
@@ -311,7 +333,7 @@ class TestFRMClientGetPlayers:
         """Test players with empty names are filtered."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"Name": "Valid", "Id": "id1", "PingMs": 50, "Online": True},
                 {"Name": "", "Id": "id2", "PingMs": 50, "Online": True},
@@ -331,7 +353,7 @@ class TestFRMClientGetPower:
         """Test successful power stats retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {
                     "PowerProduction": 1000.0,
@@ -354,10 +376,24 @@ class TestFRMClientGetPower:
         """Test power stats are aggregated across circuits."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
-                {"PowerProduction": 500.0, "PowerConsumed": 400.0, "PowerMaxConsumed": 600.0, "BatteryPercent": 50.0, "BatteryCapacity": 50.0, "FuseTriggered": False},
-                {"PowerProduction": 500.0, "PowerConsumed": 400.0, "PowerMaxConsumed": 600.0, "BatteryPercent": 75.0, "BatteryCapacity": 50.0, "FuseTriggered": False},
+                {
+                    "PowerProduction": 500.0,
+                    "PowerConsumed": 400.0,
+                    "PowerMaxConsumed": 600.0,
+                    "BatteryPercent": 50.0,
+                    "BatteryCapacity": 50.0,
+                    "FuseTriggered": False,
+                },
+                {
+                    "PowerProduction": 500.0,
+                    "PowerConsumed": 400.0,
+                    "PowerMaxConsumed": 600.0,
+                    "BatteryPercent": 75.0,
+                    "BatteryCapacity": 50.0,
+                    "FuseTriggered": False,
+                },
             ]
 
             power = await client.get_power()
@@ -372,10 +408,24 @@ class TestFRMClientGetPower:
         """Test fuse_triggered is True if any circuit is tripped."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
-                {"PowerProduction": 500.0, "PowerConsumed": 400.0, "PowerMaxConsumed": 600.0, "BatteryPercent": 0, "BatteryCapacity": 0, "FuseTriggered": False},
-                {"PowerProduction": 500.0, "PowerConsumed": 400.0, "PowerMaxConsumed": 600.0, "BatteryPercent": 0, "BatteryCapacity": 0, "FuseTriggered": True},
+                {
+                    "PowerProduction": 500.0,
+                    "PowerConsumed": 400.0,
+                    "PowerMaxConsumed": 600.0,
+                    "BatteryPercent": 0,
+                    "BatteryCapacity": 0,
+                    "FuseTriggered": False,
+                },
+                {
+                    "PowerProduction": 500.0,
+                    "PowerConsumed": 400.0,
+                    "PowerMaxConsumed": 600.0,
+                    "BatteryPercent": 0,
+                    "BatteryCapacity": 0,
+                    "FuseTriggered": True,
+                },
             ]
 
             power = await client.get_power()
@@ -391,7 +441,7 @@ class TestFRMClientGetFactoryStats:
         """Test successful factory stats retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"IsProducing": True, "Productivity": 100.0},
                 {"IsProducing": True, "Productivity": 80.0},
@@ -414,9 +464,14 @@ class TestFRMClientGetTrains:
         """Test successful train retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
-                {"Name": "Train1", "ForwardSpeed": 100, "Status": "Running", "PowerConsumed": 50},
+                {
+                    "Name": "Train1",
+                    "ForwardSpeed": 100,
+                    "Status": "Running",
+                    "PowerConsumed": 50,
+                },
             ]
 
             trains = await client.get_trains()
@@ -433,9 +488,14 @@ class TestFRMClientGetDrones:
         """Test successful drone retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
-                {"HomeStation": "Home", "PairedStation": "Dest", "CurrentFlyingMode": "Flying", "FlyingSpeed": 50},
+                {
+                    "HomeStation": "Home",
+                    "PairedStation": "Dest",
+                    "CurrentFlyingMode": "Flying",
+                    "FlyingSpeed": 50,
+                },
             ]
 
             drones = await client.get_drones()
@@ -452,10 +512,15 @@ class TestFRMClientGetStorageItems:
         """Test successful storage item retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"Inventory": [{"Name": "Iron Ore", "Amount": 100}]},
-                {"Inventory": [{"Name": "Iron Ore", "Amount": 50}, {"Name": "Copper Ore", "Amount": 75}]},
+                {
+                    "Inventory": [
+                        {"Name": "Iron Ore", "Amount": 50},
+                        {"Name": "Copper Ore", "Amount": 75},
+                    ]
+                },
             ]
 
             items = await client.get_storage_items()
@@ -469,9 +534,14 @@ class TestFRMClientGetStorageItems:
         """Test storage search filtering."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
-                {"Inventory": [{"Name": "Iron Ore", "Amount": 100}, {"Name": "Copper Ore", "Amount": 50}]},
+                {
+                    "Inventory": [
+                        {"Name": "Iron Ore", "Amount": 100},
+                        {"Name": "Copper Ore", "Amount": 50},
+                    ]
+                },
             ]
 
             items = await client.get_storage_items("iron")
@@ -487,9 +557,14 @@ class TestFRMClientGetSinkStats:
         """Test successful sink stats retrieval."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
-                {"NumCoupon": 10, "TotalPoints": 100000, "PointsToCoupon": 5000, "Percent": 0.5},
+                {
+                    "NumCoupon": 10,
+                    "TotalPoints": 100000,
+                    "PointsToCoupon": 5000,
+                    "Percent": 0.5,
+                },
             ]
 
             sink = await client.get_sink_stats()
@@ -517,7 +592,9 @@ class TestFRMClientHealthCheck:
         mock_response = AsyncMock()
         mock_response.status = 200
 
-        mock_session.get = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.get = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.health_check()
 
@@ -531,7 +608,9 @@ class TestFRMClientHealthCheck:
         mock_response = AsyncMock()
         mock_response.status = 500
 
-        mock_session.get = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.get = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.health_check()
 
@@ -545,7 +624,7 @@ class TestFRMClientInitializeTimestamp:
         """Test successful timestamp initialization."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"ServerTimeStamp": 100.0},
                 {"ServerTimeStamp": 200.0},
@@ -559,7 +638,7 @@ class TestFRMClientInitializeTimestamp:
         """Test timestamp initialization with no messages."""
         client = FRMClient("http://localhost:8082", "token")
 
-        with patch.object(client, '_get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client, "_get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = []
 
             await client.initialize_timestamp()

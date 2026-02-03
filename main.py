@@ -150,7 +150,9 @@ class CommandHandler:
         ]
 
         if power.battery_capacity > 0:
-            lines.append(f"  Battery: {power.battery_percent:.0f}% ({power.battery_capacity:.1f} MWh)")
+            lines.append(
+                f"  Battery: {power.battery_percent:.0f}% ({power.battery_capacity:.1f} MWh)"
+            )
 
         return "\n".join(lines)
 
@@ -266,7 +268,9 @@ class CommandHandler:
             ("no_arachnids", "No Spiders"),
         ]
 
-        enabled = [(label, settings[key]) for key, label in cheat_keys if settings.get(key)]
+        enabled = [
+            (label, settings[key]) for key, label in cheat_keys if settings.get(key)
+        ]
 
         if not enabled:
             return "Cheats: None enabled"
@@ -333,7 +337,7 @@ class CommandHandler:
 
         lines = [f"Trains ({len(trains)}):"]
         for t in trains:
-            speed = f"{t['speed']:.0f} km/h" if t['speed'] > 0 else "stopped"
+            speed = f"{t['speed']:.0f} km/h" if t["speed"] > 0 else "stopped"
             lines.append(f"  - {t['name']}: {t['status']} ({speed})")
         return "\n".join(lines)
 
@@ -356,8 +360,8 @@ class CommandHandler:
 
         lines = [f"Vehicles ({len(vehicles)}):"]
         for v in vehicles:
-            status = "autopilot" if v['autopilot'] else "manual"
-            speed = f"{v['speed']:.0f} km/h" if v['speed'] > 0 else "parked"
+            status = "autopilot" if v["autopilot"] else "manual"
+            speed = f"{v['speed']:.0f} km/h" if v["speed"] > 0 else "parked"
             lines.append(f"  - {v['type']}: {speed} ({status})")
         return "\n".join(lines)
 
@@ -372,9 +376,11 @@ class CommandHandler:
         total_producing = 0
 
         for name, data in sorted(gens.items()):
-            lines.append(f"  {name}: {data['count']}x ({data['producing']:.0f}/{data['capacity']:.0f} MW)")
-            total_capacity += data['capacity']
-            total_producing += data['producing']
+            lines.append(
+                f"  {name}: {data['count']}x ({data['producing']:.0f}/{data['capacity']:.0f} MW)"
+            )
+            total_capacity += data["capacity"]
+            total_producing += data["producing"]
 
         lines.append(f"Total: {total_producing:.0f}/{total_capacity:.0f} MW")
         return "\n".join(lines)
@@ -407,7 +413,7 @@ class CommandHandler:
         stats = stats[:10]
         lines = ["Production (items/min):"]
         for s in stats:
-            net = s['net']
+            net = s["net"]
             sign = "+" if net >= 0 else ""
             lines.append(f"  {s['name']}: {sign}{net:.1f}")
         return "\n".join(lines)
@@ -433,7 +439,7 @@ class CommandHandler:
 
         lines = [f"Power Switches ({len(switches)}):"]
         for s in switches:
-            state = "ON" if s['is_on'] else "OFF"
+            state = "ON" if s["is_on"] else "OFF"
             lines.append(f"  - {s['name']}: {state}")
         return "\n".join(lines)
 
@@ -476,7 +482,9 @@ class Bridge:
                 api_token=config.server_api_token,
             )
 
-        self.command_handler = CommandHandler(self.frm_client, config, self.server_client)
+        self.command_handler = CommandHandler(
+            self.frm_client, config, self.server_client
+        )
 
         # Track processed message timestamps to prevent duplicates
         self._processed_signal_timestamps: set[int] = set()
@@ -522,13 +530,17 @@ class Bridge:
                 self._sent_to_game.discard(msg_key)
                 continue
 
-            formatted = self._format_game_message(msg.sender, msg.message, msg.message_type)
+            formatted = self._format_game_message(
+                msg.sender, msg.message, msg.message_type
+            )
             await self.signal_client.send_to_group(formatted)
             self.logger.info("Game -> Signal: %s", formatted)
 
     async def poll_signal_messages(self) -> None:
         """Poll Signal messages and handle them appropriately."""
-        messages = await self.signal_client.receive_messages_ws(timeout=self.config.poll_interval)
+        messages = await self.signal_client.receive_messages_ws(
+            timeout=self.config.poll_interval
+        )
 
         for msg in messages:
             # Skip already processed messages
@@ -577,7 +589,7 @@ class Bridge:
         # Trim tracking set if needed
         if len(self._sent_to_game) > self._max_sent_tracked:
             # Remove oldest entries (just clear half)
-            to_remove = list(self._sent_to_game)[:self._max_sent_tracked // 2]
+            to_remove = list(self._sent_to_game)[: self._max_sent_tracked // 2]
             for key in to_remove:
                 self._sent_to_game.discard(key)
 
@@ -606,7 +618,9 @@ class Bridge:
         """Trim the processed timestamps set to prevent memory growth."""
         if len(self._processed_signal_timestamps) > self._max_tracked_timestamps:
             sorted_ts = sorted(self._processed_signal_timestamps)
-            self._processed_signal_timestamps = set(sorted_ts[-self._max_tracked_timestamps // 2 :])
+            self._processed_signal_timestamps = set(
+                sorted_ts[-self._max_tracked_timestamps // 2 :]
+            )
 
     async def _game_chat_loop(self) -> None:
         """Continuous loop for polling game chat."""
@@ -638,7 +652,9 @@ class Bridge:
         self.logger.info("FRM API: %s", self.config.frm_api_url)
         if self.server_client:
             self.logger.info("Server API: %s", self.config.server_api_url)
-        self.logger.info("Group ID: %s", self.config.signal_group_id or "(none - DM only mode)")
+        self.logger.info(
+            "Group ID: %s", self.config.signal_group_id or "(none - DM only mode)"
+        )
         self.logger.info("Poll interval: %s seconds", self.config.poll_interval)
 
         # Check API connectivity
@@ -646,9 +662,13 @@ class Bridge:
         frm_ok = await self.frm_client.health_check()
 
         if not signal_ok:
-            self.logger.warning("Signal API is not reachable - will retry during operation")
+            self.logger.warning(
+                "Signal API is not reachable - will retry during operation"
+            )
         if not frm_ok:
-            self.logger.warning("FRM API is not reachable - will retry during operation")
+            self.logger.warning(
+                "FRM API is not reachable - will retry during operation"
+            )
 
         # Initialize FRM timestamp to avoid replaying old messages
         await self.frm_client.initialize_timestamp()

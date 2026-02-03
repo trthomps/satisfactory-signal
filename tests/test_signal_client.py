@@ -148,7 +148,9 @@ class TestSignalClientSendMessage:
         mock_response.json = AsyncMock(return_value={"timestamp": 123456})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_message("Hello!")
 
@@ -166,7 +168,9 @@ class TestSignalClientSendMessage:
         mock_response.json = AsyncMock(return_value={"timestamp": 123456})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_message("Hello!", recipient="+0987654321")
 
@@ -196,7 +200,9 @@ class TestSignalClientSendMessage:
         mock_response.json = AsyncMock(return_value={"error": "Rate limited"})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_message("Hello!")
 
@@ -241,7 +247,9 @@ class TestSignalClientSendToGroup:
         mock_response.json = AsyncMock(return_value={"timestamp": 123456})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_to_group("Hello group!")
 
@@ -281,7 +289,9 @@ class TestSignalClientSendDM:
         mock_response.json = AsyncMock(return_value={"timestamp": 123456})
         mock_response.raise_for_status = MagicMock()
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_dm("Hello!", "+0987654321")
 
@@ -529,7 +539,9 @@ class TestSignalClientSendReadReceipt:
         mock_response = AsyncMock()
         mock_response.status = 204
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_read_receipt("+0987654321", 1234567890000)
 
@@ -546,7 +558,9 @@ class TestSignalClientSendReadReceipt:
         mock_response = AsyncMock()
         mock_response.status = 400
 
-        mock_session.post = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.send_read_receipt("+0987654321", 1234567890000)
 
@@ -588,7 +602,9 @@ class TestSignalClientHealthCheck:
         mock_response = AsyncMock()
         mock_response.status = 200
 
-        mock_session.get = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.get = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.health_check()
 
@@ -605,7 +621,9 @@ class TestSignalClientHealthCheck:
         mock_response = AsyncMock()
         mock_response.status = 500
 
-        mock_session.get = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
+        mock_session.get = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
         result = await client.health_check()
 

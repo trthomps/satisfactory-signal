@@ -41,7 +41,9 @@ class SignalClient:
         self.api_url = api_url.rstrip("/")
         self.phone_number = phone_number
         self.group_id = group_id  # Full format: group.xxx or internal format
-        self._ws_url = self.api_url.replace("http://", "ws://").replace("https://", "wss://")
+        self._ws_url = self.api_url.replace("http://", "ws://").replace(
+            "https://", "wss://"
+        )
         self._session: Optional[aiohttp.ClientSession] = None
 
         # Extract internal group ID for matching incoming messages
@@ -50,6 +52,7 @@ class SignalClient:
             if group_id.startswith("group."):
                 # Decode the base64 part after "group." to get internal ID
                 import base64
+
                 try:
                     encoded = group_id[6:]  # Remove "group." prefix
                     self._internal_group_id = base64.b64decode(encoded).decode("utf-8")
@@ -78,7 +81,9 @@ class SignalClient:
             return False
         return incoming_group_id == self._internal_group_id
 
-    async def send_message(self, text: str, group_id: Optional[str] = None, recipient: Optional[str] = None) -> bool:
+    async def send_message(
+        self, text: str, group_id: Optional[str] = None, recipient: Optional[str] = None
+    ) -> bool:
         """Send a message to a group or individual recipient."""
         # Prioritize explicit recipient over group
         if recipient:

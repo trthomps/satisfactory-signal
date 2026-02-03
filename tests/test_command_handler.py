@@ -499,7 +499,12 @@ class TestCmdDrones:
     async def test_drones_success(self, handler, mock_frm):
         """Test drones retrieval."""
         mock_frm.get_drones.return_value = [
-            {"home": "Station A", "destination": "Station B", "status": "Flying", "speed": 50},
+            {
+                "home": "Station A",
+                "destination": "Station B",
+                "status": "Flying",
+                "speed": 50,
+            },
         ]
 
         result = await handler.cmd_drones("")
@@ -522,8 +527,22 @@ class TestCmdVehicles:
     async def test_vehicles_success(self, handler, mock_frm):
         """Test vehicles retrieval."""
         mock_frm.get_vehicles.return_value = [
-            {"type": "Truck", "name": "Truck1", "speed": 50, "gear": 3, "autopilot": True, "fuel_pct": 80},
-            {"type": "Tractor", "name": "Tractor1", "speed": 0, "gear": 0, "autopilot": False, "fuel_pct": 50},
+            {
+                "type": "Truck",
+                "name": "Truck1",
+                "speed": 50,
+                "gear": 3,
+                "autopilot": True,
+                "fuel_pct": 80,
+            },
+            {
+                "type": "Tractor",
+                "name": "Tractor1",
+                "speed": 0,
+                "gear": 0,
+                "autopilot": False,
+                "fuel_pct": 50,
+            },
         ]
 
         result = await handler.cmd_vehicles("")
