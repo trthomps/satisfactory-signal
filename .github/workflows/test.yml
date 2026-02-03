@@ -22,8 +22,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --group test
 
-      - name: Run tests
-        run: uv run pytest --cov --cov-report=term-missing
+      - name: Run tests with coverage
+        run: uv run pytest --cov --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
-      - name: Check coverage
-        run: uv run pytest --cov --cov-fail-under=70
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
