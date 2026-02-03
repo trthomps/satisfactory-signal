@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0](https://github.com/trthomps/satisfactory-signal/compare/v0.1.2...v0.2.0) (2026-02-03)
+
+
+### Features
+
+* add emoji conversion and attachment handling for game compatibility ([1167a10](https://github.com/trthomps/satisfactory-signal/commit/1167a10be203d4ee4474b266ce7a549245963a86))
+* handle Signal mentions ([@someone](https://github.com/someone)) in game chat ([a518d1c](https://github.com/trthomps/satisfactory-signal/commit/a518d1ceda65518a2df01176277e2dce210bf419))
+
+
+### Bug Fixes
+
+* remove unused imports in test files ([3525448](https://github.com/trthomps/satisfactory-signal/commit/3525448e80e973bebc69aecf76c62123bc54e9ab))
+
+
+### Documentation
+
+* add coverage badge and test instructions ([d6f8e76](https://github.com/trthomps/satisfactory-signal/commit/d6f8e7631c46d0fa8c1cb2a6e76fa7622180b9d0))
+* add GitHub release badge to README ([07a0d29](https://github.com/trthomps/satisfactory-signal/commit/07a0d294ddf1eeb16f2510aaa60aa6d8c2e79eb2))
+
 ## [0.1.2](https://github.com/trthomps/satisfactory-signal/compare/v0.1.1...v0.1.2) (2026-02-03)
 
 
