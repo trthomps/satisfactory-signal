@@ -1,5 +1,6 @@
 # Satisfactory-Signal Bridge
 
+[![GitHub release](https://img.shields.io/github/v/release/trthomps/satisfactory-signal)](https://github.com/trthomps/satisfactory-signal/releases/latest)
 [![Test](https://github.com/trthomps/satisfactory-signal/actions/workflows/test.yml/badge.svg)](https://github.com/trthomps/satisfactory-signal/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/trthomps/satisfactory-signal/graph/badge.svg)](https://codecov.io/gh/trthomps/satisfactory-signal)
 
