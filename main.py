@@ -68,7 +68,7 @@ class CommandHandler:
             "connect": self.cmd_connect,
         }
 
-    def handle(self, text: str) -> str:
+    async def handle(self, text: str) -> str:
         """Process a command and return the response."""
         text = text.strip()
 
@@ -85,7 +85,7 @@ class CommandHandler:
             return self.cmd_help(args)
 
         handler = self.commands.get(cmd, self.cmd_unknown)
-        result = handler(args)
+        result = await handler(args)
 
         # If server is offline, append status
         if not self.frm.is_online and cmd != "help":
@@ -116,13 +116,13 @@ class CommandHandler:
             "  connect - Server connection info"
         )
 
-    def cmd_unknown(self, args: str) -> str:
+    async def cmd_unknown(self, args: str) -> str:
         """Handle unknown commands."""
         return "Unknown command. Type 'help' for available commands."
 
-    def cmd_list(self, _: str) -> str:
+    async def cmd_list(self, _: str) -> str:
         """List online players."""
-        players = self.frm.get_players()
+        players = await self.frm.get_players()
         if not players:
             return "No players online (or FRM unavailable)"
 
@@ -132,9 +132,9 @@ class CommandHandler:
             lines.append(f"  - {p.name}{ping_str}")
         return "\n".join(lines)
 
-    def cmd_power(self, _: str) -> str:
+    async def cmd_power(self, _: str) -> str:
         """Show power grid status."""
-        power = self.frm.get_power()
+        power = await self.frm.get_power()
         if not power:
             return "Power data unavailable"
 
@@ -150,13 +150,15 @@ class CommandHandler:
         ]
 
         if power.battery_capacity > 0:
-            lines.append(f"  Battery: {power.battery_percent:.0f}% ({power.battery_capacity:.1f} MWh)")
+            lines.append(
+                f"  Battery: {power.battery_percent:.0f}% ({power.battery_capacity:.1f} MWh)"
+            )
 
         return "\n".join(lines)
 
-    def cmd_status(self, _: str) -> str:
+    async def cmd_status(self, _: str) -> str:
         """Show server status."""
-        session = self.frm.get_session_info()
+        session = await self.frm.get_session_info()
         if not session:
             if not self.frm.is_online:
                 return "Server: OFFLINE"
@@ -172,7 +174,7 @@ class CommandHandler:
         is_day = "Day" if session.get("IsDay", True) else "Night"
 
         # Get online player count
-        players = self.frm.get_players()
+        players = await self.frm.get_players()
         player_count = len(players)
 
         return (
@@ -182,12 +184,12 @@ class CommandHandler:
             f"Playtime: {playtime}"
         )
 
-    def cmd_session(self, _: str) -> str:
+    async def cmd_session(self, _: str) -> str:
         """Show detailed session info from dedicated server API."""
         if not self.server:
             return "Server API not configured"
 
-        info = self.server.get_session_info()
+        info = await self.server.get_session_info()
         if not info:
             return "Session info unavailable"
 
@@ -215,12 +217,12 @@ class CommandHandler:
 
         return "\n".join(lines)
 
-    def cmd_settings(self, _: str) -> str:
+    async def cmd_settings(self, _: str) -> str:
         """Show server settings."""
         if not self.server:
             return "Server API not configured"
 
-        options = self.server.get_server_options()
+        options = await self.server.get_server_options()
         if not options:
             return "Settings unavailable"
 
@@ -242,12 +244,12 @@ class CommandHandler:
 
         return "\n".join(lines)
 
-    def cmd_cheats(self, _: str) -> str:
+    async def cmd_cheats(self, _: str) -> str:
         """Show cheat/advanced settings."""
         if not self.server:
             return "Server API not configured"
 
-        settings = self.server.get_advanced_settings()
+        settings = await self.server.get_advanced_settings()
         if not settings:
             return "Cheat settings unavailable"
 
@@ -266,7 +268,9 @@ class CommandHandler:
             ("no_arachnids", "No Spiders"),
         ]
 
-        enabled = [(label, settings[key]) for key, label in cheat_keys if settings.get(key)]
+        enabled = [
+            (label, settings[key]) for key, label in cheat_keys if settings.get(key)
+        ]
 
         if not enabled:
             return "Cheats: None enabled"
@@ -277,12 +281,12 @@ class CommandHandler:
 
         return "\n".join(lines)
 
-    def cmd_saves(self, _: str) -> str:
+    async def cmd_saves(self, _: str) -> str:
         """Show recent save files."""
         if not self.server:
             return "Server API not configured"
 
-        saves = self.server.get_saves(limit=5)
+        saves = await self.server.get_saves(limit=5)
         if not saves:
             return "No saves found"
 
@@ -311,9 +315,9 @@ class CommandHandler:
         lines.append("(* = current session)")
         return "\n".join(lines)
 
-    def cmd_factory(self, _: str) -> str:
+    async def cmd_factory(self, _: str) -> str:
         """Show factory statistics."""
-        stats = self.frm.get_factory_stats()
+        stats = await self.frm.get_factory_stats()
         if not stats:
             return "Factory data unavailable"
 
@@ -325,21 +329,21 @@ class CommandHandler:
             f"  Avg Efficiency: {stats['avg_efficiency']:.1f}%"
         )
 
-    def cmd_trains(self, _: str) -> str:
+    async def cmd_trains(self, _: str) -> str:
         """Show train status."""
-        trains = self.frm.get_trains()
+        trains = await self.frm.get_trains()
         if not trains:
             return "No trains found"
 
         lines = [f"Trains ({len(trains)}):"]
         for t in trains:
-            speed = f"{t['speed']:.0f} km/h" if t['speed'] > 0 else "stopped"
+            speed = f"{t['speed']:.0f} km/h" if t["speed"] > 0 else "stopped"
             lines.append(f"  - {t['name']}: {t['status']} ({speed})")
         return "\n".join(lines)
 
-    def cmd_drones(self, _: str) -> str:
+    async def cmd_drones(self, _: str) -> str:
         """Show drone status."""
-        drones = self.frm.get_drones()
+        drones = await self.frm.get_drones()
         if not drones:
             return "No drones found"
 
@@ -348,22 +352,22 @@ class CommandHandler:
             lines.append(f"  - {d['home']} -> {d['destination']}: {d['status']}")
         return "\n".join(lines)
 
-    def cmd_vehicles(self, _: str) -> str:
+    async def cmd_vehicles(self, _: str) -> str:
         """Show vehicle status."""
-        vehicles = self.frm.get_vehicles()
+        vehicles = await self.frm.get_vehicles()
         if not vehicles:
             return "No vehicles found"
 
         lines = [f"Vehicles ({len(vehicles)}):"]
         for v in vehicles:
-            status = "autopilot" if v['autopilot'] else "manual"
-            speed = f"{v['speed']:.0f} km/h" if v['speed'] > 0 else "parked"
+            status = "autopilot" if v["autopilot"] else "manual"
+            speed = f"{v['speed']:.0f} km/h" if v["speed"] > 0 else "parked"
             lines.append(f"  - {v['type']}: {speed} ({status})")
         return "\n".join(lines)
 
-    def cmd_generators(self, _: str) -> str:
+    async def cmd_generators(self, _: str) -> str:
         """Show power generation breakdown."""
-        gens = self.frm.get_generators()
+        gens = await self.frm.get_generators()
         if not gens:
             return "No generators found"
 
@@ -372,16 +376,18 @@ class CommandHandler:
         total_producing = 0
 
         for name, data in sorted(gens.items()):
-            lines.append(f"  {name}: {data['count']}x ({data['producing']:.0f}/{data['capacity']:.0f} MW)")
-            total_capacity += data['capacity']
-            total_producing += data['producing']
+            lines.append(
+                f"  {name}: {data['count']}x ({data['producing']:.0f}/{data['capacity']:.0f} MW)"
+            )
+            total_capacity += data["capacity"]
+            total_producing += data["producing"]
 
         lines.append(f"Total: {total_producing:.0f}/{total_capacity:.0f} MW")
         return "\n".join(lines)
 
-    def cmd_storage(self, args: str) -> str:
+    async def cmd_storage(self, args: str) -> str:
         """Search storage containers."""
-        items = self.frm.get_storage_items(args)
+        items = await self.frm.get_storage_items(args)
         if not items:
             if args:
                 return f"No items matching '{args}' found in storage"
@@ -397,9 +403,9 @@ class CommandHandler:
             lines.append("  ...")
         return "\n".join(lines)
 
-    def cmd_prod(self, _: str) -> str:
+    async def cmd_prod(self, _: str) -> str:
         """Show production statistics."""
-        stats = self.frm.get_production_stats()
+        stats = await self.frm.get_production_stats()
         if not stats:
             return "No production data"
 
@@ -407,14 +413,14 @@ class CommandHandler:
         stats = stats[:10]
         lines = ["Production (items/min):"]
         for s in stats:
-            net = s['net']
+            net = s["net"]
             sign = "+" if net >= 0 else ""
             lines.append(f"  {s['name']}: {sign}{net:.1f}")
         return "\n".join(lines)
 
-    def cmd_sink(self, _: str) -> str:
+    async def cmd_sink(self, _: str) -> str:
         """Show AWESOME Sink status."""
-        sink = self.frm.get_sink_stats()
+        sink = await self.frm.get_sink_stats()
         if not sink:
             return "Sink data unavailable"
 
@@ -425,19 +431,19 @@ class CommandHandler:
             f"  Next Coupon: {sink['percent']:.1f}% ({sink['points_to_coupon']:,} points)"
         )
 
-    def cmd_switches(self, _: str) -> str:
+    async def cmd_switches(self, _: str) -> str:
         """Show power switch states."""
-        switches = self.frm.get_switches()
+        switches = await self.frm.get_switches()
         if not switches:
             return "No power switches found"
 
         lines = [f"Power Switches ({len(switches)}):"]
         for s in switches:
-            state = "ON" if s['is_on'] else "OFF"
+            state = "ON" if s["is_on"] else "OFF"
             lines.append(f"  - {s['name']}: {state}")
         return "\n".join(lines)
 
-    def cmd_connect(self, _: str) -> str:
+    async def cmd_connect(self, _: str) -> str:
         """Show server connection info."""
         if not self.config.server_host:
             return "Server connection info not configured"
@@ -476,7 +482,9 @@ class Bridge:
                 api_token=config.server_api_token,
             )
 
-        self.command_handler = CommandHandler(self.frm_client, config, self.server_client)
+        self.command_handler = CommandHandler(
+            self.frm_client, config, self.server_client
+        )
 
         # Track processed message timestamps to prevent duplicates
         self._processed_signal_timestamps: set[int] = set()
@@ -506,7 +514,7 @@ class Bridge:
         if not self.config.signal_group_id:
             return
 
-        messages = self.frm_client.get_chat_messages()
+        messages = await self.frm_client.get_chat_messages()
         if not messages and not self.frm_client.is_online:
             # Server offline, skip silently
             return
@@ -522,13 +530,17 @@ class Bridge:
                 self._sent_to_game.discard(msg_key)
                 continue
 
-            formatted = self._format_game_message(msg.sender, msg.message, msg.message_type)
-            self.signal_client.send_to_group(formatted)
+            formatted = self._format_game_message(
+                msg.sender, msg.message, msg.message_type
+            )
+            await self.signal_client.send_to_group(formatted)
             self.logger.info("Game -> Signal: %s", formatted)
 
     async def poll_signal_messages(self) -> None:
         """Poll Signal messages and handle them appropriately."""
-        messages = await self.signal_client.receive_messages_ws(timeout=self.config.poll_interval)
+        messages = await self.signal_client.receive_messages_ws(
+            timeout=self.config.poll_interval
+        )
 
         for msg in messages:
             # Skip already processed messages
@@ -549,12 +561,12 @@ class Bridge:
         """Handle a message from the Signal group."""
         # Send read receipt
         if msg.sender_uuid:
-            self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
+            await self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
         # Check if it's a command (starts with /)
         if msg.text.startswith("/"):
-            response = self.command_handler.handle(msg.text)
-            self.signal_client.send_to_group(response)
+            response = await self.command_handler.handle(msg.text)
+            await self.signal_client.send_to_group(response)
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
             return
 
@@ -577,11 +589,11 @@ class Bridge:
         # Trim tracking set if needed
         if len(self._sent_to_game) > self._max_sent_tracked:
             # Remove oldest entries (just clear half)
-            to_remove = list(self._sent_to_game)[:self._max_sent_tracked // 2]
+            to_remove = list(self._sent_to_game)[: self._max_sent_tracked // 2]
             for key in to_remove:
                 self._sent_to_game.discard(key)
 
-        self.frm_client.send_chat_message(
+        await self.frm_client.send_chat_message(
             message=processed_text,
             sender=msg.sender,
         )
@@ -593,20 +605,42 @@ class Bridge:
 
         # Send read receipt
         if msg.sender_uuid:
-            self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
+            await self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
-        response = self.command_handler.handle(msg.text)
+        response = await self.command_handler.handle(msg.text)
 
         # Reply to the sender
         recipient = msg.sender_uuid or msg.sender
-        self.signal_client.send_dm(response, recipient)
+        await self.signal_client.send_dm(response, recipient)
         self.logger.info("DM reply to %s: %s", msg.sender, response[:50])
 
     def _trim_processed_timestamps(self) -> None:
         """Trim the processed timestamps set to prevent memory growth."""
         if len(self._processed_signal_timestamps) > self._max_tracked_timestamps:
             sorted_ts = sorted(self._processed_signal_timestamps)
-            self._processed_signal_timestamps = set(sorted_ts[-self._max_tracked_timestamps // 2 :])
+            self._processed_signal_timestamps = set(
+                sorted_ts[-self._max_tracked_timestamps // 2 :]
+            )
+
+    async def _game_chat_loop(self) -> None:
+        """Continuous loop for polling game chat."""
+        while not shutdown_event.is_set():
+            try:
+                await self.poll_game_chat()
+                # Small delay between game chat polls
+                await asyncio.sleep(1)
+            except Exception as e:
+                self.logger.error("Error in game chat loop: %s", e, exc_info=True)
+                await asyncio.sleep(1)
+
+    async def _signal_loop(self) -> None:
+        """Continuous loop for polling Signal messages."""
+        while not shutdown_event.is_set():
+            try:
+                await self.poll_signal_messages()
+            except Exception as e:
+                self.logger.error("Error in Signal loop: %s", e, exc_info=True)
+                await asyncio.sleep(1)
 
     async def run(self) -> None:
         """Main event loop."""
@@ -618,35 +652,41 @@ class Bridge:
         self.logger.info("FRM API: %s", self.config.frm_api_url)
         if self.server_client:
             self.logger.info("Server API: %s", self.config.server_api_url)
-        self.logger.info("Group ID: %s", self.config.signal_group_id or "(none - DM only mode)")
+        self.logger.info(
+            "Group ID: %s", self.config.signal_group_id or "(none - DM only mode)"
+        )
         self.logger.info("Poll interval: %s seconds", self.config.poll_interval)
 
         # Check API connectivity
-        signal_ok = self.signal_client.health_check()
-        frm_ok = self.frm_client.health_check()
+        signal_ok = await self.signal_client.health_check()
+        frm_ok = await self.frm_client.health_check()
 
         if not signal_ok:
-            self.logger.warning("Signal API is not reachable - will retry during operation")
+            self.logger.warning(
+                "Signal API is not reachable - will retry during operation"
+            )
         if not frm_ok:
-            self.logger.warning("FRM API is not reachable - will retry during operation")
+            self.logger.warning(
+                "FRM API is not reachable - will retry during operation"
+            )
 
         # Initialize FRM timestamp to avoid replaying old messages
-        self.frm_client.initialize_timestamp()
+        await self.frm_client.initialize_timestamp()
 
-        self.logger.info("Bridge started, polling for messages...")
+        self.logger.info("Bridge started, polling for messages (concurrent mode)...")
 
-        while not shutdown_event.is_set():
-            try:
-                # Poll game chat (only if group configured)
-                await self.poll_game_chat()
-
-                # Poll Signal messages (handles both group and DM)
-                await self.poll_signal_messages()
-
-            except Exception as e:
-                self.logger.error("Error in main loop: %s", e, exc_info=True)
-                # Brief pause on error to avoid tight loop
-                await asyncio.sleep(1)
+        try:
+            # Run both listeners concurrently
+            await asyncio.gather(
+                self._game_chat_loop(),
+                self._signal_loop(),
+            )
+        finally:
+            # Clean up aiohttp sessions
+            await self.frm_client.close()
+            await self.signal_client.close()
+            if self.server_client:
+                await self.server_client.close()
 
         self.logger.info("Bridge stopped")
 

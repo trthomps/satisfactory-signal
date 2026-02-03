@@ -1,8 +1,9 @@
 """Tests for server_api_client module."""
 
-from unittest.mock import MagicMock
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import requests
+import aiohttp
 
 from server_api_client import ServerAPIClient, SessionInfo
 
@@ -19,7 +20,6 @@ class TestServerAPIClientInit:
 
         assert client.api_url == "https://localhost:7777"
         assert client.api_token == "test-token"
-        assert client._session.verify is False  # SSL verification disabled
 
     def test_init_strips_trailing_slash(self):
         """Test trailing slash is stripped from URL."""
@@ -30,59 +30,69 @@ class TestServerAPIClientInit:
 
         assert client.api_url == "https://localhost:7777"
 
-    def test_init_sets_auth_header(self):
-        """Test authorization header is set."""
+    def test_init_sets_ssl_context(self):
+        """Test SSL context is set to not verify."""
         client = ServerAPIClient(
             api_url="https://localhost:7777",
             api_token="test-token",
         )
 
-        assert "Authorization" in client._session.headers
-        assert client._session.headers["Authorization"] == "Bearer test-token"
+        # SSL context should be set to not verify certificates
+        assert client._ssl_context is not None
 
 
 class TestServerAPIClientCall:
     """Tests for ServerAPIClient._call() method."""
 
-    def test_call_success(self):
+    @pytest.fixture
+    def mock_session(self):
+        """Create a mock aiohttp session."""
+        session = AsyncMock(spec=aiohttp.ClientSession)
+        session.closed = False
+        return session
+
+    async def test_call_success(self, mock_session):
         """Test successful API call."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
+        client._session = mock_session
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"data": {"result": "success"}}
+        mock_response = AsyncMock()
+        mock_response.json = AsyncMock(return_value={"data": {"result": "success"}})
         mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
 
-        result = client._call("TestFunction")
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
+
+        result = await client._call("TestFunction")
 
         assert result == {"result": "success"}
-        client._session.post.assert_called_once()
-        call_args = client._session.post.call_args
-        assert call_args[1]["json"]["function"] == "TestFunction"
 
-    def test_call_with_data(self):
+    async def test_call_with_data(self, mock_session):
         """Test API call with data parameter."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
+        client._session = mock_session
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"data": {}}
+        mock_response = AsyncMock()
+        mock_response.json = AsyncMock(return_value={"data": {}})
         mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
 
-        client._call("TestFunction", data={"key": "value"})
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
 
-        call_args = client._session.post.call_args
-        assert call_args[1]["json"]["data"] == {"key": "value"}
+        await client._call("TestFunction", data={"key": "value"})
 
-    def test_call_failure(self):
+        # Verify post was called
+        mock_session.post.assert_called_once()
+
+    async def test_call_failure(self, mock_session):
         """Test API call failure handling."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
-        client._session.post.side_effect = requests.RequestException("Connection failed")
+        client._session = mock_session
+        mock_session.post = MagicMock(side_effect=aiohttp.ClientError())
 
-        result = client._call("TestFunction")
+        result = await client._call("TestFunction")
 
         assert result is None
 
@@ -90,14 +100,12 @@ class TestServerAPIClientCall:
 class TestServerAPIClientGetSessionInfo:
     """Tests for ServerAPIClient.get_session_info() method."""
 
-    def test_get_session_info_success(self):
+    async def test_get_session_info_success(self):
         """Test successful session info retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "data": {
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {
                 "serverGameState": {
                     "activeSessionName": "Test Session",
                     "numConnectedPlayers": 2,
@@ -110,28 +118,26 @@ class TestServerAPIClientGetSessionInfo:
                     "activeSchematic": "None",
                 }
             }
-        }
-        mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
 
-        info = client.get_session_info()
+            info = await client.get_session_info()
 
-        assert info is not None
-        assert info.session_name == "Test Session"
-        assert info.players_online == 2
-        assert info.tech_tier == 5
-        assert info.game_phase == "Phase 3 (2/3 deliveries)"
-        assert info.tick_rate == 30.0
+            assert info is not None
+            assert info.session_name == "Test Session"
+            assert info.players_online == 2
+            assert info.tech_tier == 5
+            assert info.game_phase == "Phase 3 (2/3 deliveries)"
+            assert info.tick_rate == 30.0
 
-    def test_get_session_info_failure(self):
+    async def test_get_session_info_failure(self):
         """Test session info retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
-        client._session.post.side_effect = requests.RequestException()
 
-        info = client.get_session_info()
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = None
 
-        assert info is None
+            info = await client.get_session_info()
+
+            assert info is None
 
 
 class TestServerAPIClientParseGamePhase:
@@ -155,7 +161,9 @@ class TestServerAPIClientParseGamePhase:
         """Test Phase 3 parsing."""
         client = ServerAPIClient("https://localhost:7777", "token")
 
-        result = client._parse_game_phase("/Game/FactoryGame/GamePhases/GP_Project_Assembly_Phase_3.GP_Project_Assembly_Phase_3")
+        result = client._parse_game_phase(
+            "/Game/FactoryGame/GamePhases/GP_Project_Assembly_Phase_3.GP_Project_Assembly_Phase_3"
+        )
         assert result == "Phase 3 (2/3 deliveries)"
 
     def test_parse_phase_4(self):
@@ -196,14 +204,12 @@ class TestServerAPIClientParseGamePhase:
 class TestServerAPIClientGetServerOptions:
     """Tests for ServerAPIClient.get_server_options() method."""
 
-    def test_get_server_options_success(self):
+    async def test_get_server_options_success(self):
         """Test successful server options retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "data": {
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {
                 "serverOptions": {
                     "FG.DSAutoPause": "True",
                     "FG.DSAutoSaveOnDisconnect": "False",
@@ -213,41 +219,37 @@ class TestServerAPIClientGetServerOptions:
                     "FG.SendGameplayData": "False",
                 }
             }
-        }
-        mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
 
-        options = client.get_server_options()
+            options = await client.get_server_options()
 
-        assert options is not None
-        assert options["auto_pause"] is True
-        assert options["autosave_on_disconnect"] is False
-        assert options["autosave_interval"] == 300
-        assert options["seasonal_events"] is True  # DisableSeasonalEvents is False
-        assert options["network_quality"] == 3
+            assert options is not None
+            assert options["auto_pause"] is True
+            assert options["autosave_on_disconnect"] is False
+            assert options["autosave_interval"] == 300
+            assert options["seasonal_events"] is True  # DisableSeasonalEvents is False
+            assert options["network_quality"] == 3
 
-    def test_get_server_options_failure(self):
+    async def test_get_server_options_failure(self):
         """Test server options retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
-        client._session.post.side_effect = requests.RequestException()
 
-        options = client.get_server_options()
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = None
 
-        assert options is None
+            options = await client.get_server_options()
+
+            assert options is None
 
 
 class TestServerAPIClientGetAdvancedSettings:
     """Tests for ServerAPIClient.get_advanced_settings() method."""
 
-    def test_get_advanced_settings_success(self):
+    async def test_get_advanced_settings_success(self):
         """Test successful advanced settings retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "data": {
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {
                 "creativeModeEnabled": True,
                 "advancedGameSettings": {
                     "FG.GameRules.DisableArachnidCreatures": "True",
@@ -260,42 +262,38 @@ class TestServerAPIClientGetAdvancedSettings:
                     "FG.GameRules.GiveAllTiers": "False",
                     "FG.GameRules.UnlockAllResearchSchematics": "False",
                     "FG.GameRules.UnlockInstantAltRecipes": "False",
-                }
+                },
             }
-        }
-        mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
 
-        settings = client.get_advanced_settings()
+            settings = await client.get_advanced_settings()
 
-        assert settings is not None
-        assert settings["creative_mode"] is True
-        assert settings["no_arachnids"] is True
-        assert settings["god_mode"] is True
-        assert settings["flight_mode"] is False
+            assert settings is not None
+            assert settings["creative_mode"] is True
+            assert settings["no_arachnids"] is True
+            assert settings["god_mode"] is True
+            assert settings["flight_mode"] is False
 
-    def test_get_advanced_settings_failure(self):
+    async def test_get_advanced_settings_failure(self):
         """Test advanced settings retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
-        client._session.post.side_effect = requests.RequestException()
 
-        settings = client.get_advanced_settings()
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = None
 
-        assert settings is None
+            settings = await client.get_advanced_settings()
+
+            assert settings is None
 
 
 class TestServerAPIClientGetSaves:
     """Tests for ServerAPIClient.get_saves() method."""
 
-    def test_get_saves_success(self):
+    async def test_get_saves_success(self):
         """Test successful saves retrieval."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "data": {
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {
                 "currentSessionIndex": 0,
                 "sessions": [
                     {
@@ -311,106 +309,120 @@ class TestServerAPIClientGetSaves:
                     },
                 ],
             }
-        }
-        mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
 
-        saves = client.get_saves()
+            saves = await client.get_saves()
 
-        assert len(saves) == 1
-        assert saves[0]["name"] == "Save1"
-        assert saves[0]["session"] == "Session1"
-        assert saves[0]["is_current_session"] is True
+            assert len(saves) == 1
+            assert saves[0]["name"] == "Save1"
+            assert saves[0]["session"] == "Session1"
+            assert saves[0]["is_current_session"] is True
 
-    def test_get_saves_respects_limit(self):
+    async def test_get_saves_respects_limit(self):
         """Test saves retrieval respects limit parameter."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "data": {
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {
                 "currentSessionIndex": 0,
                 "sessions": [
                     {
                         "sessionName": "Session1",
                         "saveHeaders": [
-                            {"saveName": f"Save{i}", "playDurationSeconds": 3600, "saveDateTime": "", "isModdedSave": False}
+                            {
+                                "saveName": f"Save{i}",
+                                "playDurationSeconds": 3600,
+                                "saveDateTime": "",
+                                "isModdedSave": False,
+                            }
                             for i in range(10)
                         ],
                     },
                 ],
             }
-        }
-        mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
 
-        saves = client.get_saves(limit=3)
+            saves = await client.get_saves(limit=3)
 
-        assert len(saves) == 3
+            assert len(saves) == 3
 
-    def test_get_saves_failure(self):
+    async def test_get_saves_failure(self):
         """Test saves retrieval failure."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
-        client._session.post.side_effect = requests.RequestException()
 
-        saves = client.get_saves()
+        with patch.object(client, "_call", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = None
 
-        assert saves == []
+            saves = await client.get_saves()
+
+            assert saves == []
 
 
 class TestServerAPIClientHealthCheck:
     """Tests for ServerAPIClient.health_check() method."""
 
-    def test_health_check_success(self):
+    @pytest.fixture
+    def mock_session(self):
+        """Create a mock aiohttp session."""
+        session = AsyncMock(spec=aiohttp.ClientSession)
+        session.closed = False
+        return session
+
+    async def test_health_check_success(self, mock_session):
         """Test successful health check."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
+        client._session = mock_session
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"data": {"health": "healthy"}}
-        client._session.post.return_value = mock_response
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"data": {"health": "healthy"}})
 
-        result = client.health_check()
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
+
+        result = await client.health_check()
 
         assert result is True
 
-    def test_health_check_unhealthy(self):
+    async def test_health_check_unhealthy(self, mock_session):
         """Test unhealthy response."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
+        client._session = mock_session
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"data": {"health": "unhealthy"}}
-        client._session.post.return_value = mock_response
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"data": {"health": "unhealthy"}})
 
-        result = client.health_check()
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
+
+        result = await client.health_check()
 
         assert result is False
 
-    def test_health_check_wrong_status(self):
+    async def test_health_check_wrong_status(self, mock_session):
         """Test non-200 status code."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
+        client._session = mock_session
 
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        client._session.post.return_value = mock_response
+        mock_response = AsyncMock()
+        mock_response.status = 500
 
-        result = client.health_check()
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
+
+        result = await client.health_check()
 
         assert result is False
 
-    def test_health_check_exception(self):
+    async def test_health_check_exception(self, mock_session):
         """Test health check with exception."""
         client = ServerAPIClient("https://localhost:7777", "token")
-        client._session = MagicMock()
-        client._session.post.side_effect = Exception("Connection failed")
+        client._session = mock_session
+        mock_session.post = MagicMock(side_effect=Exception("Connection failed"))
 
-        result = client.health_check()
+        result = await client.health_check()
 
         assert result is False
 

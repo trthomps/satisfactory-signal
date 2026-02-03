@@ -3,13 +3,14 @@ name = "satisfactory-signal-bridge"
 version = "0.2.0"
 description = "Bridge between Signal Messenger and Satisfactory game chat via FRM"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 dependencies = [
     "pysignalclirestapi>=0.3.23",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "websockets>=12.0",
     "emoji>=2.0.0",
+    "aiohttp>=3.9.0",
 ]
 
 [project.scripts]

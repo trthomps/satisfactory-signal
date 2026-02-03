@@ -61,8 +61,12 @@ class TestEmojiConversion:
     def test_emoji_to_shortcode_basic(self):
         """Test basic emoji to shortcode conversion."""
         assert emoji_to_shortcode("Hello :thumbs_up:") == "Hello :thumbs_up:"
-        result = emoji_to_shortcode("Hello \U0001F600")  # grinning face
-        assert ":grinning" in result.lower() or ":smile" in result.lower() or result == "Hello :grinning_face:"
+        result = emoji_to_shortcode("Hello \U0001f600")  # grinning face
+        assert (
+            ":grinning" in result.lower()
+            or ":smile" in result.lower()
+            or result == "Hello :grinning_face:"
+        )
 
     def test_emoji_to_shortcode_empty(self):
         """Test emoji_to_shortcode with empty string."""
@@ -75,13 +79,15 @@ class TestEmojiConversion:
 
     def test_emoji_to_shortcode_multiple_emojis(self):
         """Test emoji_to_shortcode with multiple emojis."""
-        result = emoji_to_shortcode("\U0001F44D\U0001F44E")  # thumbs up, thumbs down
+        result = emoji_to_shortcode("\U0001f44d\U0001f44e")  # thumbs up, thumbs down
         assert ":" in result  # Should contain shortcodes
 
     def test_shortcode_to_emoji_basic(self):
         """Test basic shortcode to emoji conversion."""
         result = shortcode_to_emoji(":grinning_face:")
-        assert result == "\U0001F600" or ":" not in result  # Converted or already converted
+        assert (
+            result == "\U0001f600" or ":" not in result
+        )  # Converted or already converted
 
     def test_shortcode_to_emoji_empty(self):
         """Test shortcode_to_emoji with empty string."""
@@ -94,11 +100,11 @@ class TestEmojiConversion:
 
     def test_roundtrip_conversion(self):
         """Test emoji -> shortcode -> emoji roundtrip."""
-        original = "Hello \U0001F44D!"  # thumbs up
+        original = "Hello \U0001f44d!"  # thumbs up
         shortcode = emoji_to_shortcode(original)
         restored = shortcode_to_emoji(shortcode)
         # Should restore to original or equivalent
-        assert "\U0001F44D" in restored or "thumbs" in shortcode.lower()
+        assert "\U0001f44d" in restored or "thumbs" in shortcode.lower()
 
 
 class TestFormatAttachment:
@@ -136,7 +142,9 @@ class TestFormatAttachment:
 
     def test_format_spreadsheet_with_filename(self):
         """Test formatting spreadsheet with filename."""
-        attachment = Attachment(content_type="application/vnd.ms-excel", filename="data.xls")
+        attachment = Attachment(
+            content_type="application/vnd.ms-excel", filename="data.xls"
+        )
         assert format_attachment(attachment) == "[Spreadsheet: data.xls]"
 
     def test_format_archive_with_filename(self):
@@ -146,7 +154,9 @@ class TestFormatAttachment:
 
     def test_format_unknown_file_with_filename(self):
         """Test formatting unknown file type with filename."""
-        attachment = Attachment(content_type="application/octet-stream", filename="data.bin")
+        attachment = Attachment(
+            content_type="application/octet-stream", filename="data.bin"
+        )
         assert format_attachment(attachment) == "[File: data.bin]"
 
     def test_format_unknown_file_without_filename(self):
@@ -254,7 +264,7 @@ class TestProcessSignalToGame:
 
     def test_process_text_with_emoji(self):
         """Test processing text with emoji."""
-        result = process_signal_to_game("Hello \U0001F44D")  # thumbs up
+        result = process_signal_to_game("Hello \U0001f44d")  # thumbs up
         assert ":" in result  # Should contain shortcode
 
     def test_process_text_with_attachment(self):
@@ -290,7 +300,7 @@ class TestProcessSignalToGame:
 
     def test_process_all_components(self):
         """Test processing message with all components."""
-        text = f"{MENTION_PLACEHOLDER} look at this \U0001F44D"
+        text = f"{MENTION_PLACEHOLDER} look at this \U0001f44d"
         attachments = [Attachment(content_type="image/jpeg")]
         mentions = [Mention(start=0, length=1, name="Alice")]
 
@@ -318,7 +328,7 @@ class TestProcessGameToSignal:
         """Test processing text with shortcode."""
         result = process_game_to_signal("Hello :thumbs_up:")
         # Should convert shortcode to emoji or leave as is
-        assert "thumbs" in result.lower() or "\U0001F44D" in result
+        assert "thumbs" in result.lower() or "\U0001f44d" in result
 
     def test_process_empty_text(self):
         """Test processing empty text."""
@@ -336,7 +346,14 @@ class TestParseAttachments:
 
     def test_parse_single_attachment(self):
         """Test parsing a single attachment."""
-        raw = [{"contentType": "image/jpeg", "filename": "photo.jpg", "size": 1024, "id": "123"}]
+        raw = [
+            {
+                "contentType": "image/jpeg",
+                "filename": "photo.jpg",
+                "size": 1024,
+                "id": "123",
+            }
+        ]
         result = parse_attachments(raw)
 
         assert len(result) == 1
@@ -444,14 +461,30 @@ class TestContentTypeNames:
 
     def test_all_image_types(self):
         """Test all image types are mapped."""
-        image_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml"]
+        image_types = [
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/bmp",
+            "image/svg+xml",
+        ]
         for ct in image_types:
             assert ct in CONTENT_TYPE_NAMES
             assert CONTENT_TYPE_NAMES[ct] in ("Image", "GIF")
 
     def test_all_audio_types(self):
         """Test all audio types are mapped."""
-        audio_types = ["audio/aac", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "audio/x-m4a"]
+        audio_types = [
+            "audio/aac",
+            "audio/mp4",
+            "audio/mpeg",
+            "audio/ogg",
+            "audio/wav",
+            "audio/webm",
+            "audio/x-m4a",
+        ]
         for ct in audio_types:
             assert ct in CONTENT_TYPE_NAMES
             assert CONTENT_TYPE_NAMES[ct] in ("Audio", "Voice Note")

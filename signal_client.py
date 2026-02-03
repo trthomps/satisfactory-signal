@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-import requests
+import aiohttp
 import websockets
 
 from text_processing import Attachment, Mention, parse_attachments, parse_mentions
@@ -30,7 +30,7 @@ class SignalMessage:
 
 
 class SignalClient:
-    """Wrapper for Signal CLI REST API interactions with websocket support."""
+    """Async wrapper for Signal CLI REST API interactions with websocket support."""
 
     def __init__(
         self,
@@ -41,9 +41,10 @@ class SignalClient:
         self.api_url = api_url.rstrip("/")
         self.phone_number = phone_number
         self.group_id = group_id  # Full format: group.xxx or internal format
-        self._ws_url = self.api_url.replace("http://", "ws://").replace("https://", "wss://")
-        self._session = requests.Session()
-        self._session.headers.update({"Content-Type": "application/json"})
+        self._ws_url = self.api_url.replace("http://", "ws://").replace(
+            "https://", "wss://"
+        )
+        self._session: Optional[aiohttp.ClientSession] = None
 
         # Extract internal group ID for matching incoming messages
         self._internal_group_id: Optional[str] = None
@@ -51,6 +52,7 @@ class SignalClient:
             if group_id.startswith("group."):
                 # Decode the base64 part after "group." to get internal ID
                 import base64
+
                 try:
                     encoded = group_id[6:]  # Remove "group." prefix
                     self._internal_group_id = base64.b64decode(encoded).decode("utf-8")
@@ -59,13 +61,29 @@ class SignalClient:
             else:
                 self._internal_group_id = group_id
 
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create the aiohttp session."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(
+                headers={"Content-Type": "application/json"},
+                timeout=aiohttp.ClientTimeout(total=30),
+            )
+        return self._session
+
+    async def close(self) -> None:
+        """Close the aiohttp session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+
     def is_our_group(self, incoming_group_id: Optional[str]) -> bool:
         """Check if an incoming message's group ID matches our configured group."""
         if not incoming_group_id or not self._internal_group_id:
             return False
         return incoming_group_id == self._internal_group_id
 
-    def send_message(self, text: str, group_id: Optional[str] = None, recipient: Optional[str] = None) -> bool:
+    async def send_message(
+        self, text: str, group_id: Optional[str] = None, recipient: Optional[str] = None
+    ) -> bool:
         """Send a message to a group or individual recipient."""
         # Prioritize explicit recipient over group
         if recipient:
@@ -85,34 +103,34 @@ class SignalClient:
         }
 
         try:
-            response = self._session.post(
+            session = await self._get_session()
+            async with session.post(
                 f"{self.api_url}/v2/send",
                 json=payload,
-                timeout=30,
-            )
-            response.raise_for_status()
-            data = response.json()
-            if "timestamp" in data:
-                logger.debug("Sent message: %s", text[:50])
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
+                if "timestamp" in data:
+                    logger.debug("Sent message: %s", text[:50])
+                    return True
+                elif "error" in data:
+                    logger.error("Failed to send: %s", data["error"])
+                    return False
                 return True
-            elif "error" in data:
-                logger.error("Failed to send: %s", data["error"])
-                return False
-            return True
         except Exception as e:
             logger.error("Failed to send Signal message: %s", e)
             return False
 
-    def send_to_group(self, text: str) -> bool:
+    async def send_to_group(self, text: str) -> bool:
         """Send a message to the configured group."""
         if not self.group_id:
             logger.warning("No group configured")
             return False
-        return self.send_message(text, group_id=self.group_id)
+        return await self.send_message(text, group_id=self.group_id)
 
-    def send_dm(self, text: str, recipient: str) -> bool:
+    async def send_dm(self, text: str, recipient: str) -> bool:
         """Send a direct message to a specific recipient (UUID or username)."""
-        return self.send_message(text, recipient=recipient)
+        return await self.send_message(text, recipient=recipient)
 
     async def receive_messages_ws(self, timeout: float = 5.0) -> list[SignalMessage]:
         """Receive messages via websocket (for json-rpc mode)."""
@@ -186,7 +204,7 @@ class SignalClient:
             mentions=mentions,
         )
 
-    def send_read_receipt(self, recipient: str, timestamp: int) -> bool:
+    async def send_read_receipt(self, recipient: str, timestamp: int) -> bool:
         """Send a read receipt for a message."""
         payload = {
             "receipt_type": "read",
@@ -195,24 +213,29 @@ class SignalClient:
         }
 
         try:
-            response = self._session.post(
+            session = await self._get_session()
+            async with session.post(
                 f"{self.api_url}/v1/receipts/{self.phone_number}",
                 json=payload,
-                timeout=10,
-            )
-            if response.status_code == 204:
-                logger.debug("Sent read receipt to %s", recipient)
-                return True
-            return False
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as response:
+                if response.status == 204:
+                    logger.debug("Sent read receipt to %s", recipient)
+                    return True
+                return False
         except Exception as e:
             logger.debug("Failed to send read receipt: %s", e)
             return False
 
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         """Check if Signal API is reachable."""
         try:
-            response = self._session.get(f"{self.api_url}/v1/about", timeout=5)
-            return response.status_code == 200
+            session = await self._get_session()
+            async with session.get(
+                f"{self.api_url}/v1/about",
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as response:
+                return response.status == 200
         except Exception as e:
             logger.error("Signal API health check failed: %s", e)
             return False

@@ -34,7 +34,7 @@ def sample_config():
 @pytest.fixture
 def mock_signal_client():
     """Return a mocked SignalClient."""
-    with patch.object(SignalClient, '__init__', lambda self, *args, **kwargs: None):
+    with patch.object(SignalClient, "__init__", lambda self, *args, **kwargs: None):
         client = SignalClient.__new__(SignalClient)
         client.api_url = "http://localhost:8080"
         client.phone_number = "+1234567890"
@@ -48,7 +48,7 @@ def mock_signal_client():
 @pytest.fixture
 def mock_frm_client():
     """Return a mocked FRMClient."""
-    with patch.object(FRMClient, '__init__', lambda self, *args, **kwargs: None):
+    with patch.object(FRMClient, "__init__", lambda self, *args, **kwargs: None):
         client = FRMClient.__new__(FRMClient)
         client.api_url = "http://localhost:8082"
         client.access_token = "test-token"
@@ -62,7 +62,7 @@ def mock_frm_client():
 @pytest.fixture
 def mock_server_client():
     """Return a mocked ServerAPIClient."""
-    with patch.object(ServerAPIClient, '__init__', lambda self, *args, **kwargs: None):
+    with patch.object(ServerAPIClient, "__init__", lambda self, *args, **kwargs: None):
         client = ServerAPIClient.__new__(ServerAPIClient)
         client.api_url = "https://localhost:7777"
         client.api_token = "test-token"

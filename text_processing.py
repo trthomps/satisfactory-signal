@@ -135,7 +135,17 @@ def format_attachment(attachment: Attachment) -> str:
 
     # For known types, just show the type
     # But include filename for documents if it's informative
-    if display_type in ("PDF", "Document", "Spreadsheet", "Presentation", "Archive", "Text File", "CSV", "JSON", "XML"):
+    if display_type in (
+        "PDF",
+        "Document",
+        "Spreadsheet",
+        "Presentation",
+        "Archive",
+        "Text File",
+        "CSV",
+        "JSON",
+        "XML",
+    ):
         if attachment.filename:
             return f"[{display_type}: {attachment.filename}]"
 
@@ -266,12 +276,14 @@ def parse_attachments(raw_attachments: list[dict]) -> list[Attachment]:
     """
     attachments = []
     for raw in raw_attachments:
-        attachments.append(Attachment(
-            content_type=raw.get("contentType", "application/octet-stream"),
-            filename=raw.get("filename"),
-            size=raw.get("size"),
-            id=raw.get("id"),
-        ))
+        attachments.append(
+            Attachment(
+                content_type=raw.get("contentType", "application/octet-stream"),
+                filename=raw.get("filename"),
+                size=raw.get("size"),
+                id=raw.get("id"),
+            )
+        )
     return attachments
 
 
@@ -288,10 +300,12 @@ def parse_mentions(raw_mentions: list[dict]) -> list[Mention]:
     for raw in raw_mentions:
         # Get name, falling back to number if name not available
         name = raw.get("name") or raw.get("number") or "Unknown"
-        mentions.append(Mention(
-            start=raw.get("start", 0),
-            length=raw.get("length", 1),
-            name=name,
-            uuid=raw.get("uuid"),
-        ))
+        mentions.append(
+            Mention(
+                start=raw.get("start", 0),
+                length=raw.get("length", 1),
+                name=name,
+                uuid=raw.get("uuid"),
+            )
+        )
     return mentions
