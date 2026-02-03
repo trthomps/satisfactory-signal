@@ -558,11 +558,12 @@ class Bridge:
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
             return
 
-        # Process message for game: convert emojis to shortcodes, format attachments
+        # Process message for game: convert emojis to shortcodes, replace mentions, format attachments
         processed_text = process_signal_to_game(
             text=msg.text,
             attachments=msg.attachments,
             has_sticker=msg.has_sticker,
+            mentions=msg.mentions,
         )
 
         # Skip if there's nothing to send after processing

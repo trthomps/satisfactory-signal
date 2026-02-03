@@ -9,7 +9,7 @@ from typing import Any, Optional
 import requests
 import websockets
 
-from text_processing import Attachment, parse_attachments
+from text_processing import Attachment, Mention, parse_attachments, parse_mentions
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class SignalMessage:
     is_group: bool = False
     attachments: list[Attachment] = field(default_factory=list)
     has_sticker: bool = False
+    mentions: list[Mention] = field(default_factory=list)
 
 
 class SignalClient:
@@ -149,6 +150,10 @@ class SignalClient:
         raw_attachments = data_message.get("attachments", [])
         attachments = parse_attachments(raw_attachments) if raw_attachments else []
 
+        # Parse mentions
+        raw_mentions = data_message.get("mentions", [])
+        mentions = parse_mentions(raw_mentions) if raw_mentions else []
+
         # Check for sticker
         has_sticker = "sticker" in data_message
 
@@ -178,6 +183,7 @@ class SignalClient:
             is_group=is_group,
             attachments=attachments,
             has_sticker=has_sticker,
+            mentions=mentions,
         )
 
     def send_read_receipt(self, recipient: str, timestamp: int) -> bool:
