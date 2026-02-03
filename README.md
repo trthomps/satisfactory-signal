@@ -1,5 +1,8 @@
 # Satisfactory-Signal Bridge
 
+[![Test](https://github.com/trthomps/satisfactory-signal/actions/workflows/test.yml/badge.svg)](https://github.com/trthomps/satisfactory-signal/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/trthomps/satisfactory-signal/graph/badge.svg)](https://codecov.io/gh/trthomps/satisfactory-signal)
+
 A bot that bridges Signal Messenger and Satisfactory game chat using the [Ficsit Remote Monitoring](https://ficsit.app/mod/FicsitRemoteMonitoring) mod.
 
 ## Features
@@ -145,7 +148,13 @@ Generate a token via the server's web UI or API.
 
 ```bash
 # Install dev dependencies
-uv sync --dev
+uv sync --dev --group test
+
+# Run tests
+uv run pytest
+
+# Run tests with coverage
+uv run pytest --cov --cov-report=term-missing
 
 # Run linting
 uv run ruff check .
