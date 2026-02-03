@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Optional
 
-import requests
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +42,29 @@ class PowerStats:
 
 
 class FRMClient:
-    """Wrapper for FRM API interactions."""
+    """Async wrapper for FRM API interactions."""
 
     def __init__(self, api_url: str, access_token: str):
         self.api_url = api_url.rstrip("/")
         self.access_token = access_token
         self.last_timestamp: float = 0.0
-        self._session = requests.Session()
-        self._session.headers.update({"Content-Type": "application/json"})
+        self._session: Optional[aiohttp.ClientSession] = None
         self._is_online: bool = False
         self._last_error: str = ""
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create the aiohttp session."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(
+                headers={"Content-Type": "application/json"},
+                timeout=aiohttp.ClientTimeout(total=5),
+            )
+        return self._session
+
+    async def close(self) -> None:
+        """Close the aiohttp session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
 
     @property
     def is_online(self) -> bool:
@@ -66,38 +79,36 @@ class FRMClient:
             logger.warning("Game server is now OFFLINE: %s", error or "Connection lost")
 
         self._is_online = online
-        self._last_error = error
+        self._last_error = error if not online else ""
 
     @property
     def last_error(self) -> str:
         """Get the last error message."""
         return self._last_error
 
-    def _get(self, endpoint: str) -> Optional[Any]:
+    async def _get(self, endpoint: str) -> Optional[Any]:
         """Make a GET request to the FRM API."""
         try:
-            response = self._session.get(
-                f"{self.api_url}/{endpoint}",
-                timeout=5,
-            )
-            response.raise_for_status()
-            self._set_online(True)
-            return response.json()
-        except requests.ConnectionError:
+            session = await self._get_session()
+            async with session.get(f"{self.api_url}/{endpoint}") as response:
+                response.raise_for_status()
+                self._set_online(True)
+                return await response.json()
+        except aiohttp.ClientConnectorError:
             self._set_online(False, "Cannot connect to game server")
             return None
-        except requests.Timeout:
+        except TimeoutError:
             self._set_online(False, "Game server timeout")
             return None
-        except requests.RequestException as e:
+        except aiohttp.ClientError as e:
             self._set_online(False, f"Server error: {e}")
             logger.error("FRM API request failed (%s): %s", endpoint, e)
             return None
 
-    def get_chat_messages(self) -> list[ChatMessage]:
+    async def get_chat_messages(self) -> list[ChatMessage]:
         """Fetch chat messages from the game, returning only new ones."""
         messages: list[ChatMessage] = []
-        data = self._get("getChatMessages")
+        data = await self._get("getChatMessages")
 
         if not data:
             return messages
@@ -131,7 +142,7 @@ class FRMClient:
 
         return messages
 
-    def send_chat_message(
+    async def send_chat_message(
         self,
         message: str,
         sender: Optional[str] = None,
@@ -147,30 +158,31 @@ class FRMClient:
             payload["color"] = color
 
         try:
-            response = self._session.post(
+            session = await self._get_session()
+            async with session.post(
                 f"{self.api_url}/sendChatMessage",
                 json=payload,
                 headers={"X-FRM-Authorization": self.access_token},
-                timeout=10,
-            )
-            response.raise_for_status()
-            data = response.json()
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
 
-            if data and isinstance(data, list) and data[0].get("IsSent"):
-                logger.debug("Sent chat message: %s", message[:50])
-                return True
-            else:
-                logger.warning("Message not confirmed as sent: %s", data)
-                return False
+                if data and isinstance(data, list) and data[0].get("IsSent"):
+                    logger.debug("Sent chat message: %s", message[:50])
+                    return True
+                else:
+                    logger.warning("Message not confirmed as sent: %s", data)
+                    return False
 
-        except requests.RequestException as e:
+        except aiohttp.ClientError as e:
             logger.error("Failed to send chat message: %s", e)
             return False
 
-    def get_players(self) -> list[Player]:
+    async def get_players(self) -> list[Player]:
         """Get list of online players."""
         players: list[Player] = []
-        data = self._get("getPlayer")
+        data = await self._get("getPlayer")
 
         if not data:
             return players
@@ -195,9 +207,9 @@ class FRMClient:
 
         return players
 
-    def get_power(self) -> Optional[PowerStats]:
+    async def get_power(self) -> Optional[PowerStats]:
         """Get power grid statistics."""
-        data = self._get("getPower")
+        data = await self._get("getPower")
 
         if not data:
             return None
@@ -232,13 +244,13 @@ class FRMClient:
             logger.error("Failed to parse power stats: %s", e)
             return None
 
-    def get_session_info(self) -> Optional[dict]:
+    async def get_session_info(self) -> Optional[dict]:
         """Get session/server information."""
-        return self._get("getSessionInfo")
+        return await self._get("getSessionInfo")
 
-    def get_factory_stats(self) -> Optional[dict]:
+    async def get_factory_stats(self) -> Optional[dict]:
         """Get overall factory statistics."""
-        data = self._get("getFactory")
+        data = await self._get("getFactory")
         if not data:
             return None
 
@@ -258,9 +270,9 @@ class FRMClient:
             "avg_efficiency": avg_efficiency,
         }
 
-    def get_trains(self) -> list[dict]:
+    async def get_trains(self) -> list[dict]:
         """Get train information."""
-        data = self._get("getTrains")
+        data = await self._get("getTrains")
         if not data:
             return []
 
@@ -274,9 +286,9 @@ class FRMClient:
             })
         return trains
 
-    def get_drones(self) -> list[dict]:
+    async def get_drones(self) -> list[dict]:
         """Get drone information."""
-        data = self._get("getDrone")
+        data = await self._get("getDrone")
         if not data:
             return []
 
@@ -290,12 +302,12 @@ class FRMClient:
             })
         return drones
 
-    def get_vehicles(self) -> list[dict]:
+    async def get_vehicles(self) -> list[dict]:
         """Get all vehicle information (trucks, tractors, explorers)."""
         vehicles = []
 
         for endpoint, vtype in [("getTruck", "Truck"), ("getTractor", "Tractor"), ("getExplorer", "Explorer")]:
-            data = self._get(endpoint)
+            data = await self._get(endpoint)
             if data:
                 for v in data:
                     vehicles.append({
@@ -308,9 +320,9 @@ class FRMClient:
                     })
         return vehicles
 
-    def get_generators(self) -> dict:
+    async def get_generators(self) -> dict:
         """Get power generator statistics grouped by type."""
-        data = self._get("getGenerators")
+        data = await self._get("getGenerators")
         if not data:
             return {}
 
@@ -327,9 +339,9 @@ class FRMClient:
 
         return generators
 
-    def get_storage_items(self, search: str = "") -> list[dict]:
+    async def get_storage_items(self, search: str = "") -> list[dict]:
         """Search for items in storage containers."""
-        data = self._get("getStorageInv")
+        data = await self._get("getStorageInv")
         if not data:
             return []
 
@@ -357,9 +369,9 @@ class FRMClient:
             reverse=True,
         )
 
-    def get_production_stats(self) -> list[dict]:
+    async def get_production_stats(self) -> list[dict]:
         """Get production/consumption rates."""
-        data = self._get("getProdStats")
+        data = await self._get("getProdStats")
         if not data:
             return []
 
@@ -379,9 +391,9 @@ class FRMClient:
         # Sort by net production
         return sorted(stats, key=lambda x: x["net"], reverse=True)
 
-    def get_sink_stats(self) -> Optional[dict]:
+    async def get_sink_stats(self) -> Optional[dict]:
         """Get AWESOME Sink statistics."""
-        data = self._get("getResourceSink")
+        data = await self._get("getResourceSink")
         if not data:
             return None
 
@@ -394,9 +406,9 @@ class FRMClient:
             "percent": sink.get("Percent", 0) * 100,
         }
 
-    def get_switches(self) -> list[dict]:
+    async def get_switches(self) -> list[dict]:
         """Get power switch states."""
-        data = self._get("getSwitches")
+        data = await self._get("getSwitches")
         if not data:
             return []
 
@@ -408,21 +420,19 @@ class FRMClient:
             })
         return switches
 
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         """Check if FRM API is reachable."""
         try:
-            response = self._session.get(
-                f"{self.api_url}/getChatMessages",
-                timeout=5,
-            )
-            return response.status_code == 200
+            session = await self._get_session()
+            async with session.get(f"{self.api_url}/getChatMessages") as response:
+                return response.status == 200
         except Exception as e:
             logger.error("FRM API health check failed: %s", e)
             return False
 
-    def initialize_timestamp(self) -> None:
+    async def initialize_timestamp(self) -> None:
         """Initialize last_timestamp to current latest message to avoid replaying old messages."""
-        data = self._get("getChatMessages")
+        data = await self._get("getChatMessages")
         if data:
             self.last_timestamp = max(msg.get("ServerTimeStamp", 0.0) for msg in data)
             logger.info("Initialized FRM timestamp to %f", self.last_timestamp)
