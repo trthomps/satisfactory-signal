@@ -187,7 +187,7 @@ class CommandHandler:
         if not self.server:
             return "Server API not configured"
 
-        info = self.server.get_session_info()
+        info = await self.server.get_session_info()
         if not info:
             return "Session info unavailable"
 
@@ -220,7 +220,7 @@ class CommandHandler:
         if not self.server:
             return "Server API not configured"
 
-        options = self.server.get_server_options()
+        options = await self.server.get_server_options()
         if not options:
             return "Settings unavailable"
 
@@ -247,7 +247,7 @@ class CommandHandler:
         if not self.server:
             return "Server API not configured"
 
-        settings = self.server.get_advanced_settings()
+        settings = await self.server.get_advanced_settings()
         if not settings:
             return "Cheat settings unavailable"
 
@@ -282,7 +282,7 @@ class CommandHandler:
         if not self.server:
             return "Server API not configured"
 
-        saves = self.server.get_saves(limit=5)
+        saves = await self.server.get_saves(limit=5)
         if not saves:
             return "No saves found"
 
@@ -665,6 +665,8 @@ class Bridge:
             # Clean up aiohttp sessions
             await self.frm_client.close()
             await self.signal_client.close()
+            if self.server_client:
+                await self.server_client.close()
 
         self.logger.info("Bridge stopped")
 

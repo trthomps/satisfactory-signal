@@ -34,7 +34,14 @@ def mock_frm():
 @pytest.fixture
 def mock_server():
     """Create a mock Server API client."""
-    return MagicMock(spec=ServerAPIClient)
+    server = MagicMock(spec=ServerAPIClient)
+    # Make all server methods async mocks
+    server.get_session_info = AsyncMock(return_value=None)
+    server.get_server_options = AsyncMock(return_value=None)
+    server.get_advanced_settings = AsyncMock(return_value=None)
+    server.get_saves = AsyncMock(return_value=[])
+    server.health_check = AsyncMock(return_value=True)
+    return server
 
 
 @pytest.fixture

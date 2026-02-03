@@ -1,14 +1,11 @@
 """Satisfactory Dedicated Server API client."""
 
 import logging
+import ssl
 from dataclasses import dataclass
 from typing import Optional
 
-import requests
-import urllib3
-
-# Suppress SSL warnings for self-signed certificates
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -29,41 +26,58 @@ class SessionInfo:
 
 
 class ServerAPIClient:
-    """Client for Satisfactory Dedicated Server API."""
+    """Async client for Satisfactory Dedicated Server API."""
 
     def __init__(self, api_url: str, api_token: str):
         self.api_url = api_url.rstrip("/")
         self.api_token = api_token
-        self._session = requests.Session()
-        self._session.headers.update({
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_token}",
-        })
-        # Disable SSL verification for self-signed certs
-        self._session.verify = False
+        self._session: Optional[aiohttp.ClientSession] = None
+        # Create SSL context that doesn't verify certificates (for self-signed)
+        self._ssl_context = ssl.create_default_context()
+        self._ssl_context.check_hostname = False
+        self._ssl_context.verify_mode = ssl.CERT_NONE
 
-    def _call(self, function: str, data: Optional[dict] = None) -> Optional[dict]:
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create the aiohttp session."""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(ssl=self._ssl_context)
+            self._session = aiohttp.ClientSession(
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_token}",
+                },
+                timeout=aiohttp.ClientTimeout(total=10),
+                connector=connector,
+            )
+        return self._session
+
+    async def close(self) -> None:
+        """Close the aiohttp session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+    async def _call(self, function: str, data: Optional[dict] = None) -> Optional[dict]:
         """Make an API call to the server."""
         payload: dict = {"function": function}
         if data:
             payload["data"] = data
 
         try:
-            response = self._session.post(
+            session = await self._get_session()
+            async with session.post(
                 f"{self.api_url}/api/v1",
                 json=payload,
-                timeout=10,
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("data")
-        except requests.RequestException as e:
+            ) as response:
+                response.raise_for_status()
+                result = await response.json()
+                return result.get("data")
+        except aiohttp.ClientError as e:
             logger.error("Server API request failed (%s): %s", function, e)
             return None
 
-    def get_session_info(self) -> Optional[SessionInfo]:
+    async def get_session_info(self) -> Optional[SessionInfo]:
         """Get current session information."""
-        data = self._call("QueryServerState")
+        data = await self._call("QueryServerState")
         if not data:
             return None
 
@@ -107,9 +121,9 @@ class ServerAPIClient:
             return "Complete!"
         return "Unknown"
 
-    def get_server_options(self) -> Optional[dict]:
+    async def get_server_options(self) -> Optional[dict]:
         """Get server options/settings."""
-        data = self._call("GetServerOptions")
+        data = await self._call("GetServerOptions")
         if not data:
             return None
 
@@ -125,9 +139,9 @@ class ServerAPIClient:
             "send_gameplay_data": options.get("FG.SendGameplayData", "False") == "True",
         }
 
-    def get_advanced_settings(self) -> Optional[dict]:
+    async def get_advanced_settings(self) -> Optional[dict]:
         """Get advanced game settings (cheats)."""
-        data = self._call("GetAdvancedGameSettings")
+        data = await self._call("GetAdvancedGameSettings")
         if not data:
             return None
 
@@ -149,9 +163,9 @@ class ServerAPIClient:
             "all_alt_recipes": settings.get("FG.GameRules.UnlockInstantAltRecipes", "False") == "True",
         }
 
-    def get_saves(self, limit: int = 5) -> list[dict]:
+    async def get_saves(self, limit: int = 5) -> list[dict]:
         """Get recent save files."""
-        data = self._call("EnumerateSessions")
+        data = await self._call("EnumerateSessions")
         if not data:
             return []
 
@@ -180,18 +194,19 @@ class ServerAPIClient:
 
         return saves[:limit]
 
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         """Check if server API is reachable."""
         try:
-            response = self._session.post(
+            session = await self._get_session()
+            async with session.post(
                 f"{self.api_url}/api/v1",
                 json={"function": "HealthCheck", "data": {"ClientCustomData": ""}},
-                timeout=5,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("data", {}).get("health") == "healthy"
-            return False
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get("data", {}).get("health") == "healthy"
+                return False
         except Exception as e:
             logger.error("Server API health check failed: %s", e)
             return False
