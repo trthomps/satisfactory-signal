@@ -11,6 +11,7 @@ from config import Config
 from frm_client import FRMClient
 from server_api_client import ServerAPIClient
 from signal_client import SignalClient, SignalMessage
+from text_processing import process_game_to_signal, process_signal_to_game
 
 # Global shutdown flag
 shutdown_event: Optional[asyncio.Event] = None
@@ -490,6 +491,9 @@ class Bridge:
         # Replace <PlayerName/> placeholder with actual sender name
         message = message.replace("<PlayerName/>", sender)
 
+        # Convert shortcodes back to emojis for Signal display
+        message = process_game_to_signal(message)
+
         if msg_type == "System":
             return f"[System] {message}"
         elif msg_type == "Ada":
@@ -554,8 +558,19 @@ class Bridge:
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
             return
 
+        # Process message for game: convert emojis to shortcodes, format attachments
+        processed_text = process_signal_to_game(
+            text=msg.text,
+            attachments=msg.attachments,
+            has_sticker=msg.has_sticker,
+        )
+
+        # Skip if there's nothing to send after processing
+        if not processed_text:
+            return
+
         # Track this message to avoid echoing it back
-        msg_key = f"{msg.sender}:{msg.text}"
+        msg_key = f"{msg.sender}:{processed_text}"
         self._sent_to_game.add(msg_key)
 
         # Trim tracking set if needed
@@ -566,10 +581,10 @@ class Bridge:
                 self._sent_to_game.discard(key)
 
         self.frm_client.send_chat_message(
-            message=msg.text,
+            message=processed_text,
             sender=msg.sender,
         )
-        self.logger.info("Signal -> Game: [%s] %s", msg.sender, msg.text)
+        self.logger.info("Signal -> Game: [%s] %s", msg.sender, processed_text)
 
     async def _handle_dm(self, msg: SignalMessage) -> None:
         """Handle a direct message (command)."""
