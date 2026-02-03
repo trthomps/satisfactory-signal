@@ -1,8 +1,6 @@
 """Tests for signal_client module."""
 
-import base64
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from signal_client import SignalClient, SignalMessage
 

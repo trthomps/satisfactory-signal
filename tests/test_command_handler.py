@@ -1,7 +1,7 @@
 """Tests for CommandHandler in main module."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from config import Config
 from frm_client import FRMClient, Player, PowerStats
