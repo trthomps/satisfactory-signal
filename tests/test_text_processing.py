@@ -1,6 +1,5 @@
 """Tests for text_processing module."""
 
-import pytest
 from text_processing import (
     Attachment,
     Mention,
