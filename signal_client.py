@@ -3,11 +3,13 @@
 import asyncio
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import requests
 import websockets
+
+from text_processing import Attachment, parse_attachments
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,8 @@ class SignalMessage:
     timestamp: int
     group_id: Optional[str] = None
     is_group: bool = False
+    attachments: list[Attachment] = field(default_factory=list)
+    has_sticker: bool = False
 
 
 class SignalClient:
@@ -139,8 +143,17 @@ class SignalClient:
         if not data_message:
             return None
 
-        text = data_message.get("message")
-        if not text:
+        text = data_message.get("message", "")
+
+        # Parse attachments
+        raw_attachments = data_message.get("attachments", [])
+        attachments = parse_attachments(raw_attachments) if raw_attachments else []
+
+        # Check for sticker
+        has_sticker = "sticker" in data_message
+
+        # Skip messages with no content (no text, no attachments, no sticker)
+        if not text and not attachments and not has_sticker:
             return None
 
         # Skip messages from ourselves
@@ -163,6 +176,8 @@ class SignalClient:
             timestamp=timestamp,
             group_id=group_id,
             is_group=is_group,
+            attachments=attachments,
+            has_sticker=has_sticker,
         )
 
     def send_read_receipt(self, recipient: str, timestamp: int) -> bool:
