@@ -1,203 +1,158 @@
 # Satisfactory-Signal Bridge
 
-A Python bot that bridges Signal Messenger and Satisfactory game chat using the Ficsit Remote Monitoring (FRM) mod's API.
+A bot that bridges Signal Messenger and Satisfactory game chat using the [Ficsit Remote Monitoring](https://ficsit.app/mod/FicsitRemoteMonitoring) mod.
 
 ## Features
 
-- **Bidirectional messaging**: Messages flow between Signal and Satisfactory in both directions
-- **Player name prefixing**: Game messages show player names in Signal, Signal messages show sender names in-game
-- **Message deduplication**: Prevents message loops and duplicate processing
-- **Graceful error handling**: Continues operation when APIs are temporarily unavailable
+- **Bidirectional chat** - Messages flow between Signal group and in-game chat
+- **Bot commands** - Query server status, power, players, and more via DM or group
+- **Dedicated Server API** - Session info, settings, saves from the server API
+- **Lightweight** - 58MB distroless Docker image
 
-## Prerequisites
+## Quick Start (Docker)
 
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/) package manager
-- Docker and Docker Compose
-- Satisfactory with the [Ficsit Remote Monitoring](https://ficsit.app/mod/FicsitRemoteMonitoring) mod installed
-- A Signal account with a registered phone number
+```bash
+docker run -d --name satisfactory-signal \
+  -e SIGNAL_API_URL=http://signal-api:8080 \
+  -e SIGNAL_PHONE_NUMBER=+1234567890 \
+  -e SIGNAL_GROUP_ID=group.xxx \
+  -e FRM_API_URL=http://game-server:8082 \
+  -e FRM_ACCESS_TOKEN=your-token \
+  ghcr.io/trthomps/satisfactory-signal:latest
+```
+
+## Commands
+
+Send these via DM to the bot or in the bridged group chat:
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/list` | Online players |
+| `/status` | Server info (day/night, playtime) |
+| `/session` | Session details (tier, phase, tick rate) |
+| `/settings` | Server settings (auto-pause, autosave) |
+| `/cheats` | Cheat settings if any enabled |
+| `/saves` | Recent save files |
+| `/power` | Power grid status |
+| `/generators` | Power generation breakdown |
+| `/factory` | Building stats |
+| `/prod` | Production rates |
+| `/storage [item]` | Search storage containers |
+| `/sink` | AWESOME Sink stats |
+| `/trains` | Train status |
+| `/drones` | Drone status |
+| `/vehicles` | Vehicle status |
+| `/switches` | Power switch states |
+| `/connect` | Server connection info |
 
 ## Installation
 
-### 1. Clone the repository
+### Prerequisites
+
+- [Ficsit Remote Monitoring](https://ficsit.app/mod/FicsitRemoteMonitoring) mod installed on your Satisfactory server
+- [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) running with a registered number
+- Docker (for containerized deployment) or Python 3.10+ (for local development)
+
+### Option 1: Docker Compose
+
+```yaml
+services:
+  satisfactory-signal:
+    image: ghcr.io/trthomps/satisfactory-signal:latest
+    restart: unless-stopped
+    env_file: .env
+```
+
+### Option 2: Local Development
 
 ```bash
 git clone https://github.com/trthomps/satisfactory-signal.git
 cd satisfactory-signal
-```
-
-### 2. Install dependencies with uv
-
-```bash
 uv sync
-```
-
-### 3. Set up signal-cli-rest-api
-
-Start the Signal API container:
-
-```bash
-docker compose up -d
-```
-
-### 4. Register or link your Signal number
-
-**Option A: Register a new number**
-
-```bash
-# Request verification code
-curl -X POST 'http://localhost:8080/v1/register/+1234567890'
-
-# Verify with the code you received
-curl -X POST 'http://localhost:8080/v1/register/+1234567890/verify/123456'
-```
-
-**Option B: Link to an existing Signal account**
-
-```bash
-# Get QR code link
-curl 'http://localhost:8080/v1/qrcodelink?device_name=satisfactory-bridge'
-```
-
-Scan the QR code with your Signal app (Settings -> Linked Devices).
-
-### 5. Configure the bot
-
-Copy the example environment file and edit it:
-
-```bash
 cp .env.example .env
-```
-
-Edit `.env` with your settings:
-
-```bash
-# Your registered Signal phone number
-SIGNAL_PHONE_NUMBER=+1234567890
-
-# Either use a group ID or recipient numbers
-SIGNAL_GROUP_ID=base64groupid==
-# OR
-SIGNAL_RECIPIENTS=+1234567891,+1234567892
-
-# FRM API settings (check FRM mod settings in-game for the URL)
-FRM_API_URL=http://localhost:8082
-FRM_ACCESS_TOKEN=your-token-from-frm-settings
-```
-
-### 6. Configure FRM in Satisfactory
-
-1. Open Satisfactory and load your save
-2. Press Escape -> Mods -> Ficsit Remote Monitoring
-3. Enable the Web Server
-4. Note the port (default is 8080, but you may need to change it if it conflicts)
-5. Enable "Require API Key" and copy the access token to your `.env` file
-
-## Usage
-
-Run the bot:
-
-```bash
+# Edit .env with your settings
 uv run python main.py
 ```
 
-Or use the installed script:
+## Configuration
+
+Copy `.env.example` to `.env` and configure:
 
 ```bash
-uv run satisfactory-signal-bridge
+# Signal API (required)
+SIGNAL_API_URL=http://localhost:8080
+SIGNAL_PHONE_NUMBER=+1234567890
+SIGNAL_GROUP_ID=group.YOUR_GROUP_ID_HERE
+
+# FRM API (required for game data)
+FRM_API_URL=http://localhost:8082
+FRM_ACCESS_TOKEN=your-frm-access-token
+
+# Dedicated Server API (optional, for /session /settings /cheats /saves)
+SERVER_API_URL=https://your.server.com:7777
+SERVER_API_TOKEN=your-api-token
+
+# Bot settings
+POLL_INTERVAL=2.0
+LOG_LEVEL=INFO
+BOT_NAME=SignalBot
+
+# Server connection info (for /connect command)
+SERVER_HOST=your.server.com
+SERVER_PORT=7777
+SERVER_PASSWORD=yourpassword
 ```
-
-### Running as a service (systemd)
-
-Create `/etc/systemd/system/satisfactory-signal.service`:
-
-```ini
-[Unit]
-Description=Satisfactory Signal Bridge
-After=network.target docker.service
-
-[Service]
-Type=simple
-User=your-user
-WorkingDirectory=/path/to/satisfactory-signal
-ExecStart=/path/to/.local/bin/uv run python main.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-
-```bash
-sudo systemctl enable satisfactory-signal
-sudo systemctl start satisfactory-signal
-```
-
-## Configuration Options
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SIGNAL_API_URL` | `http://localhost:8080` | URL of signal-cli-rest-api |
-| `SIGNAL_PHONE_NUMBER` | *required* | Your Signal phone number |
-| `SIGNAL_GROUP_ID` | | Signal group ID (base64) |
-| `SIGNAL_RECIPIENTS` | | Comma-separated phone numbers |
-| `FRM_API_URL` | `http://localhost:8082` | URL of FRM web server |
-| `FRM_ACCESS_TOKEN` | *required* | FRM API access token |
-| `POLL_INTERVAL` | `2.0` | Seconds between polling |
-| `LOG_LEVEL` | `INFO` | Logging verbosity (DEBUG, INFO, WARNING, ERROR) |
-| `BOT_NAME` | `SignalBot` | Name used to identify bot messages |
-
-## Troubleshooting
-
-### Signal API not responding
-
-1. Check if the container is running: `docker compose ps`
-2. Check container logs: `docker compose logs signal-cli-rest-api`
-3. Verify the phone number is registered: `curl http://localhost:8080/v1/about`
-
-### FRM API not responding
-
-1. Verify Satisfactory is running with the FRM mod
-2. Check the FRM port in-game (Mods -> Ficsit Remote Monitoring)
-3. Test the endpoint: `curl http://localhost:8082/getChatMessages`
-
-### Messages not being sent to Satisfactory
-
-1. Verify your FRM access token is correct
-2. Check that "Require API Key" is enabled in FRM settings
-3. Test sending directly:
-   ```bash
-   curl -X POST 'http://localhost:8082/sendChatMessage' \
-     -H 'Content-Type: application/json' \
-     -H 'X-FRM-Authorization: your-token' \
-     -d '{"message": "Test"}'
-   ```
 
 ### Getting a Signal Group ID
-
-List your groups:
 
 ```bash
 curl 'http://localhost:8080/v1/groups/+1234567890'
 ```
 
-The group ID will be in base64 format.
+### Getting FRM Access Token
+
+1. Open Satisfactory → Mods → Ficsit Remote Monitoring
+2. Enable Web Server
+3. Enable "Require API Key"
+4. Copy the access token
+
+### Getting Dedicated Server API Token
+
+Generate a token via the server's web UI or API.
+
+## Configuration Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SIGNAL_API_URL` | No | `http://localhost:8080` | signal-cli-rest-api URL |
+| `SIGNAL_PHONE_NUMBER` | Yes | | Bot's Signal phone number |
+| `SIGNAL_GROUP_ID` | No | | Group to bridge (base64) |
+| `FRM_API_URL` | No | `http://localhost:8082` | FRM web server URL |
+| `FRM_ACCESS_TOKEN` | Yes* | | FRM API token |
+| `SERVER_API_URL` | No | | Dedicated Server API URL |
+| `SERVER_API_TOKEN` | No | | Dedicated Server API token |
+| `POLL_INTERVAL` | No | `2.0` | Polling interval (seconds) |
+| `LOG_LEVEL` | No | `INFO` | Log level |
+| `BOT_NAME` | No | `SignalBot` | Bot display name in game |
+| `SERVER_HOST` | No | | Server host for /connect |
+| `SERVER_PORT` | No | `7777` | Server port for /connect |
+| `SERVER_PASSWORD` | No | | Server password for /connect |
+
+\* Required if bridging game chat
 
 ## Development
 
-Install dev dependencies:
-
 ```bash
-uv sync --all-extras
-```
+# Install dev dependencies
+uv sync --dev
 
-Run linting:
-
-```bash
+# Run linting
 uv run ruff check .
-uv run mypy .
+uv run mypy --ignore-missing-imports *.py
+
+# Build Docker image locally
+docker build -t satisfactory-signal .
 ```
 
 ## License
