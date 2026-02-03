@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/trthomps/satisfactory-signal/compare/v0.1.1...v0.1.2) (2026-02-03)
+
+
+### Bug Fixes
+
+* chain docker build in release workflow ([e3a8888](https://github.com/trthomps/satisfactory-signal/commit/e3a8888b55234b1e997a4895df7baa7f74eb2d7c))
+
 ## [0.1.1](https://github.com/trthomps/satisfactory-signal/compare/v0.1.0...v0.1.1) (2026-02-03)
 
 
