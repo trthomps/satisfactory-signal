@@ -523,7 +523,7 @@ class Bridge:
                 continue
 
             formatted = self._format_game_message(msg.sender, msg.message, msg.message_type)
-            self.signal_client.send_to_group(formatted)
+            await self.signal_client.send_to_group(formatted)
             self.logger.info("Game -> Signal: %s", formatted)
 
     async def poll_signal_messages(self) -> None:
@@ -549,12 +549,12 @@ class Bridge:
         """Handle a message from the Signal group."""
         # Send read receipt
         if msg.sender_uuid:
-            self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
+            await self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
         # Check if it's a command (starts with /)
         if msg.text.startswith("/"):
             response = await self.command_handler.handle(msg.text)
-            self.signal_client.send_to_group(response)
+            await self.signal_client.send_to_group(response)
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
             return
 
@@ -593,13 +593,13 @@ class Bridge:
 
         # Send read receipt
         if msg.sender_uuid:
-            self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
+            await self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
         response = await self.command_handler.handle(msg.text)
 
         # Reply to the sender
         recipient = msg.sender_uuid or msg.sender
-        self.signal_client.send_dm(response, recipient)
+        await self.signal_client.send_dm(response, recipient)
         self.logger.info("DM reply to %s: %s", msg.sender, response[:50])
 
     def _trim_processed_timestamps(self) -> None:
@@ -642,7 +642,7 @@ class Bridge:
         self.logger.info("Poll interval: %s seconds", self.config.poll_interval)
 
         # Check API connectivity
-        signal_ok = self.signal_client.health_check()
+        signal_ok = await self.signal_client.health_check()
         frm_ok = await self.frm_client.health_check()
 
         if not signal_ok:
@@ -662,8 +662,9 @@ class Bridge:
                 self._signal_loop(),
             )
         finally:
-            # Clean up aiohttp session
+            # Clean up aiohttp sessions
             await self.frm_client.close()
+            await self.signal_client.close()
 
         self.logger.info("Bridge stopped")
 
