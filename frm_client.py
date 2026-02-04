@@ -27,6 +27,8 @@ class Player:
     name: str
     player_id: str
     ping: int
+    dead: bool = False
+    health: float = 100.0
 
 
 @dataclass
@@ -188,6 +190,8 @@ class FRMClient:
                         name=name,
                         player_id=p.get("Id", ""),
                         ping=p.get("PingMs", 0),
+                        dead=p.get("Dead", False),
+                        health=p.get("PlayerHP", 100.0),
                     )
                 )
         except (KeyError, ValueError) as e:

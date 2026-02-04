@@ -486,6 +486,12 @@ class Bridge:
         self._sent_to_game: set[str] = set()
         self._max_sent_tracked = 100
 
+        # Track player states for join/leave/death detection
+        self._player_states: dict[str, bool] = {}  # player_id -> dead status
+        self._player_names: dict[str, str] = {}  # player_id -> name (for leave messages)
+        self._online_players: set[str] = set()  # player_ids currently online
+        self._players_initialized: bool = False
+
     def _format_game_message(self, sender: str, message: str, msg_type: str) -> str:
         """Format a game message for Signal."""
         # Replace <PlayerName/> placeholder with actual sender name
@@ -525,6 +531,55 @@ class Bridge:
             formatted = self._format_game_message(msg.sender, msg.message, msg.message_type)
             self.signal_client.send_to_group(formatted)
             self.logger.info("Game -> Signal: %s", formatted)
+
+    async def poll_player_events(self) -> None:
+        """Poll for player join/leave/death events and notify Signal group."""
+        if not self.config.signal_group_id:
+            return
+
+        players = self.frm_client.get_players()
+        if not players and not self.frm_client.is_online:
+            return
+
+        current_online = {p.player_id for p in players}
+        current_states = {p.player_id: p.dead for p in players}
+        current_names = {p.player_id: p.name for p in players}
+
+        # On first run, just initialize state without notifications
+        if not self._players_initialized:
+            self._online_players = current_online
+            self._player_states = current_states
+            self._player_names = current_names
+            self._players_initialized = True
+            self.logger.info("Initialized player tracking with %d players", len(current_online))
+            return
+
+        # Check for joins
+        joined = current_online - self._online_players
+        for pid in joined:
+            name = current_names.get(pid, "Unknown")
+            self.signal_client.send_to_group(f"[Server] {name} joined the game")
+            self.logger.info("Player joined: %s", name)
+
+        # Check for leaves
+        left = self._online_players - current_online
+        for pid in left:
+            name = self._player_names.get(pid, "Unknown")
+            self.signal_client.send_to_group(f"[Server] {name} left the game")
+            self.logger.info("Player left: %s", name)
+
+        # Check for deaths (player was alive, now dead)
+        for pid, is_dead in current_states.items():
+            was_dead = self._player_states.get(pid, False)
+            if is_dead and not was_dead:
+                name = current_names.get(pid, "Unknown")
+                self.signal_client.send_to_group(f"[Server] {name} died")
+                self.logger.info("Player died: %s", name)
+
+        # Update state
+        self._online_players = current_online
+        self._player_states = current_states
+        self._player_names.update(current_names)
 
     async def poll_signal_messages(self) -> None:
         """Poll Signal messages and handle them appropriately."""
@@ -639,6 +694,9 @@ class Bridge:
             try:
                 # Poll game chat (only if group configured)
                 await self.poll_game_chat()
+
+                # Poll player events (join/leave/death)
+                await self.poll_player_events()
 
                 # Poll Signal messages (handles both group and DM)
                 await self.poll_signal_messages()
