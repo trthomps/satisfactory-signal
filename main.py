@@ -607,7 +607,7 @@ class Bridge:
             self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
         # Check if it's a command (starts with /)
-        if msg.text.startswith("/"):
+        if msg.text and msg.text.startswith("/"):
             response = self.command_handler.handle(msg.text)
             self.signal_client.send_to_group(response)
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
