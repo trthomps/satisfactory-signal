@@ -171,14 +171,16 @@ MENTION_PLACEHOLDER = "\ufffc"
 
 
 def replace_mentions(text: str, mentions: list[Mention]) -> str:
-    """Replace mention placeholder characters with @Name.
+    """Replace mention placeholders or @UUID patterns with @Name.
 
-    Signal uses U+FFFC (Object Replacement Character) as a placeholder
-    for mentions in the message text. This function replaces those
-    placeholders with readable @Name format.
+    Signal may use either:
+    - U+FFFC (Object Replacement Character) as a placeholder
+    - @UUID directly in the text
+
+    This function handles both cases.
 
     Args:
-        text: The message text with placeholder characters
+        text: The message text with placeholders or @UUID patterns
         mentions: List of mentions with position and name info
 
     Returns:
@@ -187,16 +189,21 @@ def replace_mentions(text: str, mentions: list[Mention]) -> str:
     if not text or not mentions:
         return text
 
-    # Sort mentions by start position in reverse order
-    # so replacing doesn't affect subsequent indices
-    sorted_mentions = sorted(mentions, key=lambda m: m.start, reverse=True)
-
     result = text
+
+    # First, try replacing @UUID patterns with @Name
+    for mention in mentions:
+        if mention.uuid:
+            result = result.replace(f"@{mention.uuid}", f"@{mention.name}")
+
+    # Then, handle placeholder characters (sort by position in reverse)
+    sorted_mentions = sorted(mentions, key=lambda m: m.start, reverse=True)
     for mention in sorted_mentions:
-        # Replace the placeholder character(s) with @Name
         start = mention.start
         end = start + mention.length
-        result = result[:start] + f"@{mention.name}" + result[end:]
+        # Only replace if there's a placeholder character at this position
+        if start < len(result) and result[start] == MENTION_PLACEHOLDER:
+            result = result[:start] + f"@{mention.name}" + result[end:]
 
     return result
 
