@@ -59,6 +59,9 @@ class SignalClient:
             else:
                 self._internal_group_id = group_id
 
+        # Cache UUID -> display name for mention resolution
+        self._name_cache: dict[str, str] = {}
+
     def is_our_group(self, incoming_group_id: Optional[str]) -> bool:
         """Check if an incoming message's group ID matches our configured group."""
         if not incoming_group_id or not self._internal_group_id:
@@ -170,6 +173,22 @@ class SignalClient:
         sender_uuid = envelope.get("sourceUuid")
         timestamp = data_message.get("timestamp", 0)
 
+        # Cache sender's name for future mention resolution
+        if sender_uuid and sender != "Unknown":
+            self._name_cache[sender_uuid] = sender
+
+        # Fix mention names - Signal CLI sends UUID as name
+        for mention in mentions:
+            if mention.uuid:
+                # Try cache first, then look up from contacts
+                if mention.uuid in self._name_cache:
+                    mention.name = self._name_cache[mention.uuid]
+                else:
+                    name = self.get_contact_name(mention.uuid)
+                    if name:
+                        self._name_cache[mention.uuid] = name
+                        mention.name = name
+
         group_info = data_message.get("groupInfo", {})
         group_id = group_info.get("groupId")
         is_group = group_id is not None
@@ -207,6 +226,31 @@ class SignalClient:
         except Exception as e:
             logger.debug("Failed to send read receipt: %s", e)
             return False
+
+
+    def get_contact_name(self, uuid: str) -> Optional[str]:
+        """Look up a contact's name by UUID from the contacts list."""
+        try:
+            response = self._session.get(
+                f"{self.api_url}/v1/contacts/{self.phone_number}",
+                timeout=5,
+            )
+            if response.status_code == 200:
+                contacts = response.json()
+                for contact in contacts:
+                    if contact.get("uuid") != uuid:
+                        continue
+                    # Try profile.given_name + lastname first
+                    profile = contact.get("profile", {})
+                    given = profile.get("given_name", "")
+                    last = profile.get("lastname", "")
+                    if given:
+                        return f"{given} {last}".strip() if last else given
+                    # Fall back to other name fields
+                    return contact.get("name") or contact.get("profile_name")
+        except Exception as e:
+            logger.debug("Failed to look up contact %s: %s", uuid, e)
+        return None
 
     def health_check(self) -> bool:
         """Check if Signal API is reachable."""
