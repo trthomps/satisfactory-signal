@@ -492,6 +492,9 @@ class Bridge:
         self._online_players: set[str] = set()  # player_ids currently online
         self._players_initialized: bool = False
 
+        # Track power state for outage notifications
+        self._fuse_triggered: Optional[bool] = None
+
     def _format_game_message(self, sender: str, message: str, msg_type: str) -> str:
         """Format a game message for Signal."""
         # Replace <PlayerName/> placeholder with actual sender name
@@ -554,21 +557,7 @@ class Bridge:
             self.logger.info("Initialized player tracking with %d players", len(current_online))
             return
 
-        # Check for joins
-        joined = current_online - self._online_players
-        for pid in joined:
-            name = current_names.get(pid, "Unknown")
-            self.signal_client.send_to_group(f"[Server] {name} joined the game")
-            self.logger.info("Player joined: %s", name)
-
-        # Check for leaves
-        left = self._online_players - current_online
-        for pid in left:
-            name = self._player_names.get(pid, "Unknown")
-            self.signal_client.send_to_group(f"[Server] {name} left the game")
-            self.logger.info("Player left: %s", name)
-
-        # Check for deaths (player was alive, now dead)
+        # Check for deaths first (before join/leave to track respawns)
         for pid, is_dead in current_states.items():
             was_dead = self._player_states.get(pid, False)
             if is_dead and not was_dead:
@@ -576,10 +565,58 @@ class Bridge:
                 self.signal_client.send_to_group(f"[Server] {name} died")
                 self.logger.info("Player died: %s", name)
 
+        # Check for joins (skip if player was dead - they're just respawning)
+        joined = current_online - self._online_players
+        for pid in joined:
+            was_dead = self._player_states.get(pid, False)
+            if was_dead:
+                self.logger.debug("Skipping join for respawning player: %s", pid)
+                continue
+            name = current_names.get(pid, "Unknown")
+            self.signal_client.send_to_group(f"[Server] {name} joined the game")
+            self.logger.info("Player joined: %s", name)
+
+        # Check for leaves (skip if player is dead - they're just respawning)
+        left = self._online_players - current_online
+        for pid in left:
+            was_dead = self._player_states.get(pid, False)
+            if was_dead:
+                self.logger.debug("Skipping leave for dead player: %s", pid)
+                continue
+            name = self._player_names.get(pid, "Unknown")
+            self.signal_client.send_to_group(f"[Server] {name} left the game")
+            self.logger.info("Player left: %s", name)
+
         # Update state
         self._online_players = current_online
         self._player_states = current_states
         self._player_names.update(current_names)
+
+    async def poll_power_events(self) -> None:
+        """Poll for power outage events and notify Signal group."""
+        if not self.config.signal_group_id:
+            return
+
+        power = self.frm_client.get_power()
+        if not power:
+            return
+
+        # On first run, just initialize state
+        if self._fuse_triggered is None:
+            self._fuse_triggered = power.fuse_triggered
+            return
+
+        # Check for power outage (fuse tripped)
+        if power.fuse_triggered and not self._fuse_triggered:
+            self.signal_client.send_to_group("[Server] Power outage! Fuse has tripped")
+            self.logger.info("Power outage detected")
+
+        # Check for power restored
+        elif not power.fuse_triggered and self._fuse_triggered:
+            self.signal_client.send_to_group("[Server] Power restored")
+            self.logger.info("Power restored")
+
+        self._fuse_triggered = power.fuse_triggered
 
     async def poll_signal_messages(self) -> None:
         """Poll Signal messages and handle them appropriately."""
@@ -697,6 +734,9 @@ class Bridge:
 
                 # Poll player events (join/leave/death)
                 await self.poll_player_events()
+
+                # Poll power events (outage/restore)
+                await self.poll_power_events()
 
                 # Poll Signal messages (handles both group and DM)
                 await self.poll_signal_messages()
