@@ -1,0 +1,18 @@
+{{- if and .Values.signalCliRestApi.enabled .Values.signalCliRestApi.persistence.enabled (not .Values.signalCliRestApi.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "satisfactory-signal.signalCliRestApi.fullname" . }}-data
+  labels:
+    {{- include "satisfactory-signal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: signal-cli-rest-api
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.signalCliRestApi.persistence.storageClass }}
+  storageClassName: {{ .Values.signalCliRestApi.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.signalCliRestApi.persistence.size }}
+{{- end }}

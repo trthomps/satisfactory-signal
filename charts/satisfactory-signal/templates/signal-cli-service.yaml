@@ -1,0 +1,19 @@
+{{- if .Values.signalCliRestApi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "satisfactory-signal.signalCliRestApi.fullname" . }}
+  labels:
+    {{- include "satisfactory-signal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: signal-cli-rest-api
+spec:
+  type: {{ .Values.signalCliRestApi.service.type }}
+  ports:
+    - port: {{ .Values.signalCliRestApi.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "satisfactory-signal.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: signal-cli-rest-api
+{{- end }}

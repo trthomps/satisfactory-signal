@@ -1,0 +1,32 @@
+Satisfactory-Signal Bridge has been deployed!
+
+{{- if .Values.signalCliRestApi.enabled }}
+
+Signal CLI REST API is enabled. Before the bridge can work, you need to register/link your Signal account:
+
+1. Get the signal-cli pod name:
+   kubectl get pods -l "app.kubernetes.io/component=signal-cli-rest-api" -n {{ .Release.Namespace }}
+
+2. Register a new account (requires CAPTCHA):
+   curl -X POST "http://{{ include "satisfactory-signal.signalCliRestApi.fullname" . }}:{{ .Values.signalCliRestApi.service.port }}/v1/register/{{ .Values.config.signalPhoneNumber }}"
+
+   Or link to an existing Signal account:
+   curl "http://{{ include "satisfactory-signal.signalCliRestApi.fullname" . }}:{{ .Values.signalCliRestApi.service.port }}/v1/qrcodelink?device_name=satisfactory-signal" --output qr.png
+
+3. Once registered, the bridge will automatically connect.
+
+Signal CLI REST API is available at:
+  http://{{ include "satisfactory-signal.signalCliRestApi.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.signalCliRestApi.service.port }}
+{{- end }}
+
+Configuration:
+  Signal API URL: {{ .Values.config.signalApiUrl }}
+  FRM API URL: {{ .Values.config.frmApiUrl }}
+  {{- if .Values.config.signalGroupId }}
+  Group ID: {{ .Values.config.signalGroupId }}
+  {{- else }}
+  Mode: DM only (no group configured)
+  {{- end }}
+
+To check the bridge logs:
+  kubectl logs -f deployment/{{ include "satisfactory-signal.fullname" . }} -n {{ .Release.Namespace }}

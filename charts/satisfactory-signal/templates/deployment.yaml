@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "satisfactory-signal.fullname" . }}
+  labels:
+    {{- include "satisfactory-signal.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "satisfactory-signal.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "satisfactory-signal.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "satisfactory-signal.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SIGNAL_API_URL
+              value: {{ .Values.config.signalApiUrl | quote }}
+            - name: SIGNAL_PHONE_NUMBER
+              {{- if .Values.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: signal-phone-number
+              {{- else }}
+              value: {{ .Values.config.signalPhoneNumber | quote }}
+              {{- end }}
+            {{- if .Values.config.signalGroupId }}
+            - name: SIGNAL_GROUP_ID
+              value: {{ .Values.config.signalGroupId | quote }}
+            {{- end }}
+            - name: FRM_API_URL
+              value: {{ .Values.config.frmApiUrl | quote }}
+            - name: FRM_ACCESS_TOKEN
+              {{- if .Values.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: frm-access-token
+              {{- else }}
+              value: {{ .Values.config.frmAccessToken | quote }}
+              {{- end }}
+            {{- if .Values.config.serverApiUrl }}
+            - name: SERVER_API_URL
+              value: {{ .Values.config.serverApiUrl | quote }}
+            - name: SERVER_API_TOKEN
+              {{- if .Values.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: server-api-token
+                  optional: true
+              {{- else }}
+              value: {{ .Values.config.serverApiToken | quote }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.config.serverHost }}
+            - name: SERVER_HOST
+              value: {{ .Values.config.serverHost | quote }}
+            - name: SERVER_PORT
+              value: {{ .Values.config.serverPort | quote }}
+            {{- if or .Values.config.serverPassword .Values.existingSecret }}
+            - name: SERVER_PASSWORD
+              {{- if .Values.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: server-password
+                  optional: true
+              {{- else }}
+              value: {{ .Values.config.serverPassword | quote }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+            - name: BOT_NAME
+              value: {{ .Values.config.botName | quote }}
+            - name: POLL_INTERVAL
+              value: {{ .Values.config.pollInterval | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- if .Values.config.notificationRecipients }}
+            - name: NOTIFICATION_RECIPIENTS
+              value: {{ .Values.config.notificationRecipients | quote }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

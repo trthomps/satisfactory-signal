@@ -1,0 +1,98 @@
+# Satisfactory-Signal Bridge configuration
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/trthomps/satisfactory-signal
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to appVersion
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Bridge configuration
+config:
+  # Signal API settings
+  signalApiUrl: "http://signal-cli-rest-api:8080"
+  signalPhoneNumber: ""  # Required: +1234567890
+  signalGroupId: ""  # Optional: group.xxx for group chat bridging
+
+  # FRM (Ficsit Remote Monitoring) API settings
+  frmApiUrl: "http://satisfactory-server:8082"
+  frmAccessToken: ""  # Required for sending messages
+
+  # Dedicated Server API (optional)
+  serverApiUrl: ""
+  serverApiToken: ""
+
+  # Server connection info (for /connect command)
+  serverHost: ""
+  serverPort: "7777"
+  serverPassword: ""
+
+  # Bot settings
+  botName: "SignalBot"
+  pollInterval: "2.0"
+  logLevel: "INFO"
+
+  # Notification recipients (comma-separated UUIDs for DM notifications)
+  notificationRecipients: ""
+
+# Use existing secret for sensitive values
+existingSecret: ""
+# Secret should contain keys: signal-phone-number, frm-access-token, server-api-token, server-password
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 50m
+  #   memory: 64Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Optional: Deploy signal-cli-rest-api alongside the bridge
+signalCliRestApi:
+  enabled: false
+  image:
+    repository: bbernhard/signal-cli-rest-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  # Mode: normal, native, json-rpc
+  mode: "json-rpc"
+
+  # Persist Signal data (required to keep registration)
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 1Gi
+    existingClaim: ""
+
+  resources: {}
+    # limits:
+    #   cpu: 200m
+    #   memory: 256Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  service:
+    type: ClusterIP
+    port: 8080

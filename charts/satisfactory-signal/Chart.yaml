@@ -1,0 +1,16 @@
+apiVersion: v2
+name: satisfactory-signal
+description: A bridge between Satisfactory game chat and Signal messenger
+type: application
+version: 0.1.0
+appVersion: "0.2.0"
+keywords:
+  - satisfactory
+  - signal
+  - gaming
+  - chat-bridge
+home: https://github.com/trthomps/satisfactory-signal
+sources:
+  - https://github.com/trthomps/satisfactory-signal
+maintainers:
+  - name: trthomps
