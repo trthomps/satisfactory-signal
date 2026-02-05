@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/trthomps/satisfactory-signal/compare/v0.3.1...v0.4.0) (2026-02-05)
+
+
+### Features
+
+* add search filter to prod command ([b106569](https://github.com/trthomps/satisfactory-signal/commit/b106569b731768d8fb1084a896df9442b4e83df8))
+* add version and doggos commands ([043f412](https://github.com/trthomps/satisfactory-signal/commit/043f4123ea71a4e00d77026c83e1093478e3e131))
+
+
+### Bug Fixes
+
+* remove artificial limits on storage and prod commands ([c2c2505](https://github.com/trthomps/satisfactory-signal/commit/c2c2505126b357d4ff132b88e4c5ee5cc4d52270))
+
 ## [0.3.1](https://github.com/trthomps/satisfactory-signal/compare/v0.3.0...v0.3.1) (2026-02-05)
 
 
