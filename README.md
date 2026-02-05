@@ -87,8 +87,8 @@ services:
 ### Option 2: Kubernetes (Helm)
 
 ```bash
-# Add the chart repository (or use local chart)
-helm install satisfactory-signal ./charts/satisfactory-signal \
+# Install from GHCR OCI registry
+helm install satisfactory-signal oci://ghcr.io/trthomps/charts/satisfactory-signal \
   --set config.signalPhoneNumber="+1234567890" \
   --set config.signalGroupId="group.xxx" \
   --set config.frmApiUrl="http://satisfactory-server:8082" \
