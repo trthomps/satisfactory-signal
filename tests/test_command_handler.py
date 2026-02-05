@@ -572,7 +572,8 @@ class TestCmdStorage:
 
         result = handler.cmd_storage("")
 
-        assert "Storage:" in result
+        assert "Storage" in result
+        assert "1 items" in result
         assert "matching:" not in result
 
     def test_storage_empty_with_search(self, handler, mock_frm):
