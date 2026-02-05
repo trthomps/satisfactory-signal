@@ -8,11 +8,10 @@ WORKDIR /app
 
 COPY pyproject.toml .
 
-# Install dependencies with uv, using cache mount for speed
+# Install dependencies with uv from pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv /opt/venv && \
-    uv pip install --python=/opt/venv/bin/python \
-    pysignalclirestapi requests python-dotenv websockets
+    uv pip install --python=/opt/venv/bin/python -r pyproject.toml
 
 FROM gcr.io/distroless/python3-debian12:nonroot
 
