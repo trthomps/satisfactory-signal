@@ -412,6 +412,25 @@ class FRMClient:
             })
         return switches
 
+    def get_doggos(self) -> list[dict]:
+        """Get lizard doggo information."""
+        data = self._get("getDoggo")
+        if not data:
+            return []
+
+        doggos = []
+        for d in data:
+            # Get inventory items
+            inventory = d.get("Inventory", [])
+            items = [item.get("Name", "Unknown") for item in inventory if item.get("Amount", 0) > 0]
+
+            doggos.append({
+                "name": d.get("Name", "Lizard Doggo"),
+                "id": d.get("ID", ""),
+                "inventory": items,
+            })
+        return doggos
+
     def health_check(self) -> bool:
         """Check if FRM API is reachable."""
         try:

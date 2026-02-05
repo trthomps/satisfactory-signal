@@ -7,6 +7,8 @@ import signal
 import sys
 from typing import Optional
 
+__version__ = "0.3.1"
+
 from config import Config
 from frm_client import FRMClient
 from server_api_client import ServerAPIClient
@@ -48,6 +50,7 @@ class CommandHandler:
         self.server = server_client
         self.commands = {
             "help": self.cmd_help,
+            "version": self.cmd_version,
             "list": self.cmd_list,
             "players": self.cmd_list,
             "power": self.cmd_power,
@@ -65,6 +68,7 @@ class CommandHandler:
             "prod": self.cmd_prod,
             "sink": self.cmd_sink,
             "switches": self.cmd_switches,
+            "doggos": self.cmd_doggos,
             "connect": self.cmd_connect,
         }
 
@@ -112,13 +116,19 @@ class CommandHandler:
             "  trains - Train status\n"
             "  drones - Drone status\n"
             "  vehicles - Vehicle status\n"
+            "  doggos - Lizard doggos\n"
             "  switches - Power switches\n"
-            "  connect - Server connection info"
+            "  connect - Server connection info\n"
+            "  version - Bridge version"
         )
 
     def cmd_unknown(self, args: str) -> str:
         """Handle unknown commands."""
         return "Unknown command. Type 'help' for available commands."
+
+    def cmd_version(self, _: str) -> str:
+        """Show bridge version."""
+        return f"Satisfactory-Signal Bridge v{__version__}"
 
     def cmd_list(self, _: str) -> str:
         """List online players."""
@@ -435,6 +445,22 @@ class CommandHandler:
         for s in switches:
             state = "ON" if s['is_on'] else "OFF"
             lines.append(f"  - {s['name']}: {state}")
+        return "\n".join(lines)
+
+    def cmd_doggos(self, _: str) -> str:
+        """Show lizard doggo status."""
+        doggos = self.frm.get_doggos()
+        if not doggos:
+            return "No lizard doggos found"
+
+        lines = [f"Lizard Doggos ({len(doggos)}):"]
+        for d in doggos:
+            name = d['name'] or "Unnamed"
+            if d['inventory']:
+                items = ", ".join(d['inventory'])
+                lines.append(f"  - {name}: carrying {items}")
+            else:
+                lines.append(f"  - {name}: empty")
         return "\n".join(lines)
 
     def cmd_connect(self, _: str) -> str:
