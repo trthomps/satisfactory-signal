@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/trthomps/satisfactory-signal/compare/v0.3.0...v0.3.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* install dependencies from pyproject.toml in Dockerfile ([f981d37](https://github.com/trthomps/satisfactory-signal/commit/f981d3731f5505c3167c0fe5e8d693fc6ed1a651))
+
 ## [0.3.0](https://github.com/trthomps/satisfactory-signal/compare/v0.2.0...v0.3.0) (2026-02-05)
 
 
