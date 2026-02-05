@@ -495,6 +495,9 @@ class Bridge:
         # Track power state for outage notifications
         self._fuse_triggered: Optional[bool] = None
 
+        # Track server online state (None = not yet initialized)
+        self._server_online: Optional[bool] = None
+
     def _format_game_message(self, sender: str, message: str, msg_type: str) -> str:
         """Format a game message for Signal."""
         # Replace <PlayerName/> placeholder with actual sender name
@@ -618,6 +621,28 @@ class Bridge:
 
         self._fuse_triggered = power.fuse_triggered
 
+    async def poll_server_status(self) -> None:
+        """Check server online status and notify on changes."""
+        if not self.config.signal_group_id:
+            return
+
+        is_online = self.frm_client.is_online
+
+        # On first check, just initialize state
+        if self._server_online is None:
+            self._server_online = is_online
+            return
+
+        # Check for state change
+        if is_online and not self._server_online:
+            self.signal_client.send_to_group("[Server] Game server is back online")
+            self.logger.info("Server came online")
+        elif not is_online and self._server_online:
+            self.signal_client.send_to_group("[Server] Game server went offline")
+            self.logger.info("Server went offline")
+
+        self._server_online = is_online
+
     async def poll_signal_messages(self) -> None:
         """Poll Signal messages and handle them appropriately."""
         messages = await self.signal_client.receive_messages_ws(timeout=self.config.poll_interval)
@@ -737,6 +762,9 @@ class Bridge:
 
                 # Poll power events (outage/restore)
                 await self.poll_power_events()
+
+                # Check server online status
+                await self.poll_server_status()
 
                 # Poll Signal messages (handles both group and DM)
                 await self.poll_signal_messages()
