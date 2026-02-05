@@ -9,8 +9,10 @@ A bot that bridges Signal Messenger and Satisfactory game chat using the [Ficsit
 ## Features
 
 - **Bidirectional chat** - Messages flow between Signal group and in-game chat
+- **Event notifications** - Player join/leave/death, power outages, server online/offline
 - **Bot commands** - Query server status, power, players, and more via DM or group
 - **Dedicated Server API** - Session info, settings, saves from the server API
+- **Kubernetes ready** - Helm chart included with optional signal-cli-rest-api
 - **Lightweight** - 58MB distroless Docker image
 
 ## Quick Start (Docker)
@@ -50,6 +52,20 @@ Send these via DM to the bot or in the bridged group chat:
 | `/switches` | Power switch states |
 | `/connect` | Server connection info |
 
+## Event Notifications
+
+The bot automatically sends notifications to the Signal group for:
+
+| Event | Message |
+|-------|---------|
+| Player joins | `[Server] PlayerName joined the game` |
+| Player leaves | `[Server] PlayerName left the game` |
+| Player dies | `[Server] PlayerName died` |
+| Power outage | `[Server] Power outage! Fuse has tripped` |
+| Power restored | `[Server] Power restored` |
+| Server offline | `[Server] Game server went offline` |
+| Server online | `[Server] Game server is back online` |
+
 ## Installation
 
 ### Prerequisites
@@ -68,7 +84,38 @@ services:
     env_file: .env
 ```
 
-### Option 2: Local Development
+### Option 2: Kubernetes (Helm)
+
+```bash
+# Add the chart repository (or use local chart)
+helm install satisfactory-signal ./charts/satisfactory-signal \
+  --set config.signalPhoneNumber="+1234567890" \
+  --set config.signalGroupId="group.xxx" \
+  --set config.frmApiUrl="http://satisfactory-server:8082" \
+  --set config.frmAccessToken="your-token"
+```
+
+With signal-cli-rest-api included:
+
+```bash
+helm install satisfactory-signal ./charts/satisfactory-signal \
+  --set signalCliRestApi.enabled=true \
+  --set config.signalPhoneNumber="+1234567890" \
+  --set config.signalGroupId="group.xxx" \
+  --set config.frmApiUrl="http://satisfactory-server:8082" \
+  --set config.frmAccessToken="your-token"
+```
+
+Use `existingSecret` to reference a Kubernetes secret for sensitive values:
+
+```bash
+helm install satisfactory-signal ./charts/satisfactory-signal \
+  --set existingSecret="my-signal-secrets" \
+  --set config.signalGroupId="group.xxx" \
+  --set config.frmApiUrl="http://satisfactory-server:8082"
+```
+
+### Option 3: Local Development
 
 ```bash
 git clone https://github.com/trthomps/satisfactory-signal.git
