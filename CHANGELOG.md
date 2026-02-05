@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/trthomps/satisfactory-signal/compare/v0.2.0...v0.3.0) (2026-02-05)
+
+
+### Features
+
+* add Helm chart for Kubernetes deployment ([939be3f](https://github.com/trthomps/satisfactory-signal/commit/939be3fe09cd46878909eded5b8796b6ff31eed8))
+* add player event notifications for join, leave, and death ([503428b](https://github.com/trthomps/satisfactory-signal/commit/503428bbe06eb970f462ae1a673e2bd54dc47d60))
+* add power outage notifications ([5d44d48](https://github.com/trthomps/satisfactory-signal/commit/5d44d488dda7df26aef5f49b96adbf0cd0a589e8))
+* add server online/offline notifications ([c3b8a70](https://github.com/trthomps/satisfactory-signal/commit/c3b8a70149a0682665a80709141d306f0cce177f))
+
+
+### Bug Fixes
+
+* handle @UUID mention format from Signal ([3d08159](https://github.com/trthomps/satisfactory-signal/commit/3d081594c50b9fcc1d706de02861c2ce63b65996))
+* handle image-only messages with no text ([e9dfe19](https://github.com/trthomps/satisfactory-signal/commit/e9dfe198fd27288de893819be4607c12f94b1fbe))
+* resolve mention names from contacts API and sender cache ([0f0940c](https://github.com/trthomps/satisfactory-signal/commit/0f0940c62923246384e263aa8606b6b0f6339431))
+
+
+### Documentation
+
+* update README with Helm deployment and event notifications ([c89ab38](https://github.com/trthomps/satisfactory-signal/commit/c89ab38acfccfcb50dcbbfe36a010b5912b9a8c4))
+
 ## [0.2.0](https://github.com/trthomps/satisfactory-signal/compare/v0.1.2...v0.2.0) (2026-02-03)
 
 
