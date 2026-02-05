@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/trthomps/satisfactory-signal/compare/v0.4.0...v0.4.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* update test for new storage output format ([52fc797](https://github.com/trthomps/satisfactory-signal/commit/52fc797ca9182e03b4194c170042858195b04e96))
+
 ## [0.4.0](https://github.com/trthomps/satisfactory-signal/compare/v0.3.1...v0.4.0) (2026-02-05)
 
 
