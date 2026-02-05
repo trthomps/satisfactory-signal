@@ -1,6 +1,6 @@
 [project]
 name = "satisfactory-signal-bridge"
-version = "0.3.0"
+version = "0.3.1"
 description = "Bridge between Signal Messenger and Satisfactory game chat via FRM"
 readme = "README.md"
 requires-python = ">=3.10"
