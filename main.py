@@ -110,7 +110,7 @@ class CommandHandler:
             "  power - Power grid\n"
             "  generators - Power breakdown\n"
             "  factory - Building stats\n"
-            "  prod - Production rates\n"
+            "  prod [item] - Production rates\n"
             "  storage [item] - Search storage\n"
             "  sink - AWESOME Sink\n"
             "  trains - Train status\n"
@@ -402,13 +402,21 @@ class CommandHandler:
             lines.append(f"  {item['name']}: {item['amount']:,}")
         return "\n".join(lines)
 
-    def cmd_prod(self, _: str) -> str:
+    def cmd_prod(self, args: str) -> str:
         """Show production statistics."""
         stats = self.frm.get_production_stats()
         if not stats:
             return "No production data"
 
-        lines = [f"Production ({len(stats)} items, items/min):"]
+        # Filter by search term if provided
+        search = args.strip().lower()
+        if search:
+            stats = [s for s in stats if search in s['name'].lower()]
+            if not stats:
+                return f"No production data matching '{args}'"
+
+        header = f"Production{f' (matching: {args})' if search else ''} ({len(stats)} items, items/min):"
+        lines = [header]
         for s in stats:
             net = s['net']
             sign = "+" if net >= 0 else ""
