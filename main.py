@@ -397,14 +397,9 @@ class CommandHandler:
                 return f"No items matching '{args}' found in storage"
             return "No items in storage"
 
-        # Limit to top 15 items
-        items = items[:15]
-        lines = [f"Storage{f' (matching: {args})' if args else ''}:"]
+        lines = [f"Storage{f' (matching: {args})' if args else ''} ({len(items)} items):"]
         for item in items:
             lines.append(f"  {item['name']}: {item['amount']:,}")
-
-        if len(items) == 15:
-            lines.append("  ...")
         return "\n".join(lines)
 
     def cmd_prod(self, _: str) -> str:
@@ -413,9 +408,7 @@ class CommandHandler:
         if not stats:
             return "No production data"
 
-        # Show top 10 items by net production
-        stats = stats[:10]
-        lines = ["Production (items/min):"]
+        lines = [f"Production ({len(stats)} items, items/min):"]
         for s in stats:
             net = s['net']
             sign = "+" if net >= 0 else ""
