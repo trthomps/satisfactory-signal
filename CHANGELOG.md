@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/trthomps/satisfactory-signal/compare/v0.4.1...v0.4.2) (2026-02-06)
+
+
+### Bug Fixes
+
+* reinitialize chat timestamp when game server reconnects ([f6fcfaa](https://github.com/trthomps/satisfactory-signal/commit/f6fcfaae5b02af5a118b092df74dab7f027cac61))
+
 ## [0.4.1](https://github.com/trthomps/satisfactory-signal/compare/v0.4.0...v0.4.1) (2026-02-05)
 
 
