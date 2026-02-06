@@ -70,6 +70,53 @@ class TestFRMClientOnlineStatus:
         assert client._is_online is True
         assert client._last_error == ""
 
+    def test_timestamp_reinitialized_on_reconnect(self):
+        """Test that timestamp is reinitialized when server comes back online."""
+        client = FRMClient("http://localhost:8082", "token")
+        client._session = MagicMock()
+
+        # Set up mock response for getChatMessages
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {"ServerTimeStamp": 100.0, "Message": "test1"},
+            {"ServerTimeStamp": 200.0, "Message": "test2"},
+        ]
+        client._session.get.return_value = mock_response
+
+        # Set initial state: was online with old timestamp
+        client._is_online = True
+        client.last_timestamp = 5000.0  # Old high timestamp
+
+        # Server goes offline
+        client._set_online(False, "Connection lost")
+        assert client.last_timestamp == 5000.0  # Timestamp unchanged
+
+        # Server comes back online - timestamp should reinitialize
+        client._set_online(True)
+        assert client.last_timestamp == 200.0  # Should be max from new messages
+
+    def test_timestamp_reinitialized_to_zero_on_empty_messages(self):
+        """Test timestamp resets to 0 when server returns no messages."""
+        client = FRMClient("http://localhost:8082", "token")
+        client._session = MagicMock()
+
+        # Set up mock response with empty messages
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        client._session.get.return_value = mock_response
+
+        # Set initial state
+        client._is_online = True
+        client.last_timestamp = 5000.0
+
+        # Server goes offline then back online
+        client._set_online(False)
+        client._set_online(True)
+
+        assert client.last_timestamp == 0.0
+
 
 class TestFRMClientGet:
     """Tests for FRMClient._get() method."""
@@ -78,6 +125,7 @@ class TestFRMClientGet:
         """Test successful GET request."""
         client = FRMClient("http://localhost:8082", "token")
         client._session = MagicMock()
+        client._is_online = True  # Already online to avoid reinitialize call
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"data": "test"}

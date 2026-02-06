@@ -62,13 +62,34 @@ class FRMClient:
 
     def _set_online(self, online: bool, error: str = "") -> None:
         """Update online status and log state changes."""
-        if online and not self._is_online:
-            logger.info("Game server is now ONLINE")
-        elif not online and self._is_online:
-            logger.warning("Game server is now OFFLINE: %s", error or "Connection lost")
-
+        was_offline = not self._is_online
         self._is_online = online
         self._last_error = error
+
+        if online and was_offline:
+            logger.info("Game server is now ONLINE")
+            # Reinitialize timestamp - server may have restarted with new timestamps
+            self._reinitialize_timestamp()
+        elif not online and not was_offline:
+            logger.warning("Game server is now OFFLINE: %s", error or "Connection lost")
+
+    def _reinitialize_timestamp(self) -> None:
+        """Reinitialize timestamp to current latest message."""
+        try:
+            response = self._session.get(
+                f"{self.api_url}/getChatMessages",
+                timeout=5,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    self.last_timestamp = max(msg.get("ServerTimeStamp", 0.0) for msg in data)
+                else:
+                    self.last_timestamp = 0.0
+                logger.info("Reinitialized FRM timestamp to %f", self.last_timestamp)
+        except Exception as e:
+            logger.warning("Failed to reinitialize timestamp: %s", e)
+            self.last_timestamp = 0.0
 
     @property
     def last_error(self) -> str:
