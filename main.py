@@ -5,15 +5,26 @@ import asyncio
 import logging
 import signal
 import sys
-from typing import Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Optional, Union
 
 __version__ = "0.3.1"
 
 from config import Config
 from frm_client import FRMClient
+from grafana_client import GrafanaClient
 from server_api_client import ServerAPIClient
 from signal_client import SignalClient, SignalMessage
 from text_processing import process_game_to_signal, process_signal_to_game
+
+
+@dataclass
+class ImageResponse:
+    """A command response containing an image attachment."""
+
+    image_data: bytes
+    caption: str = ""
 
 # Global shutdown flag
 shutdown_event: Optional[asyncio.Event] = None
@@ -44,11 +55,13 @@ class CommandHandler:
         frm_client: FRMClient,
         config: Config,
         server_client: Optional[ServerAPIClient] = None,
+        grafana_client: Optional[GrafanaClient] = None,
     ):
         self.frm = frm_client
         self.config = config
         self.server = server_client
-        self.commands = {
+        self.grafana = grafana_client
+        self.commands: dict[str, Callable[[str], Union[str, ImageResponse]]] = {
             "help": self.cmd_help,
             "version": self.cmd_version,
             "list": self.cmd_list,
@@ -70,10 +83,11 @@ class CommandHandler:
             "switches": self.cmd_switches,
             "doggos": self.cmd_doggos,
             "connect": self.cmd_connect,
+            "graph": self.cmd_graph,
         }
 
-    def handle(self, text: str) -> str:
-        """Process a command and return the response."""
+    def handle(self, text: str) -> Union[str, ImageResponse]:
+        """Process a command and return the response (text or image)."""
         text = text.strip()
 
         # Handle commands with or without leading slash
@@ -91,36 +105,39 @@ class CommandHandler:
         handler = self.commands.get(cmd, self.cmd_unknown)
         result = handler(args)
 
-        # If server is offline, append status
-        if not self.frm.is_online and cmd != "help":
+        # If server is offline, append status (only for text responses)
+        if not self.frm.is_online and cmd != "help" and isinstance(result, str):
             return f"[Server Offline] {self.frm.last_error}"
 
         return result
 
     def cmd_help(self, _: str) -> str:
         """Show available commands."""
-        return (
-            "Commands:\n"
-            "  list - Online players\n"
-            "  status - Server info\n"
-            "  session - Session details\n"
-            "  settings - Server settings\n"
-            "  cheats - Cheat settings\n"
-            "  saves - Recent saves\n"
-            "  power - Power grid\n"
-            "  generators - Power breakdown\n"
-            "  factory - Building stats\n"
-            "  prod [item] - Production rates\n"
-            "  storage [item] - Search storage\n"
-            "  sink - AWESOME Sink\n"
-            "  trains - Train status\n"
-            "  drones - Drone status\n"
-            "  vehicles - Vehicle status\n"
-            "  doggos - Lizard doggos\n"
-            "  switches - Power switches\n"
-            "  connect - Server connection info\n"
-            "  version - Bridge version"
-        )
+        lines = [
+            "Commands:",
+            "  list - Online players",
+            "  status - Server info",
+            "  session - Session details",
+            "  settings - Server settings",
+            "  cheats - Cheat settings",
+            "  saves - Recent saves",
+            "  power - Power grid",
+            "  generators - Power breakdown",
+            "  factory - Building stats",
+            "  prod [item] - Production rates",
+            "  storage [item] - Search storage",
+            "  sink - AWESOME Sink",
+            "  trains - Train status",
+            "  drones - Drone status",
+            "  vehicles - Vehicle status",
+            "  doggos - Lizard doggos",
+            "  switches - Power switches",
+            "  connect - Server connection info",
+        ]
+        if self.grafana:
+            lines.append("  graph [name] [time] - Grafana graphs")
+        lines.append("  version - Bridge version")
+        return "\n".join(lines)
 
     def cmd_unknown(self, args: str) -> str:
         """Handle unknown commands."""
@@ -464,6 +481,38 @@ class CommandHandler:
                 lines.append(f"  - {name}: empty")
         return "\n".join(lines)
 
+    def cmd_graph(self, args: str) -> Union[str, ImageResponse]:
+        """Render a Grafana panel graph and return it as an image."""
+        if not self.grafana:
+            return "Grafana not configured"
+
+        available = self.grafana.get_panel_names()
+        if not available:
+            return "No Grafana panels configured"
+
+        parts = args.strip().split()
+
+        # No args or "list" -> show available panels
+        if not parts or parts[0].lower() == "list":
+            lines = ["Available graphs:"]
+            for name in available:
+                lines.append(f"  - {name}")
+            lines.append("Usage: graph <name> [time range, e.g. 1h 6h 24h 7d]")
+            return "\n".join(lines)
+
+        panel_name = parts[0].lower()
+        time_range = parts[1] if len(parts) > 1 else None
+
+        if panel_name not in available:
+            return f"Unknown graph '{panel_name}'. Available: {', '.join(available)}"
+
+        image_data = self.grafana.render_panel(panel_name, time_range=time_range)
+        if not image_data:
+            return f"Failed to render graph '{panel_name}'"
+
+        caption = f"{panel_name} ({time_range or self.grafana.default_time_range})"
+        return ImageResponse(image_data=image_data, caption=caption)
+
     def cmd_connect(self, _: str) -> str:
         """Show server connection info."""
         if not self.config.server_host:
@@ -503,7 +552,21 @@ class Bridge:
                 api_token=config.server_api_token,
             )
 
-        self.command_handler = CommandHandler(self.frm_client, config, self.server_client)
+        # Grafana client (optional)
+        self.grafana_client: Optional[GrafanaClient] = None
+        if config.grafana_url and config.grafana_api_key:
+            self.grafana_client = GrafanaClient(
+                api_url=config.grafana_url,
+                api_key=config.grafana_api_key,
+                panels=config.grafana_panels,
+                default_width=config.grafana_default_width,
+                default_height=config.grafana_default_height,
+                default_time_range=config.grafana_default_time_range,
+            )
+
+        self.command_handler = CommandHandler(
+            self.frm_client, config, self.server_client, self.grafana_client,
+        )
 
         # Track processed message timestamps to prevent duplicates
         self._processed_signal_timestamps: set[int] = set()
@@ -698,7 +761,10 @@ class Bridge:
         # Check if it's a command (starts with /)
         if msg.text and msg.text.startswith("/"):
             response = self.command_handler.handle(msg.text)
-            self.signal_client.send_to_group(response)
+            if isinstance(response, ImageResponse):
+                self.signal_client.send_image(response.image_data, caption=response.caption)
+            else:
+                self.signal_client.send_to_group(response)
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
             return
 
@@ -743,8 +809,13 @@ class Bridge:
 
         # Reply to the sender
         recipient = msg.sender_uuid or msg.sender
-        self.signal_client.send_dm(response, recipient)
-        self.logger.info("DM reply to %s: %s", msg.sender, response[:50])
+        if isinstance(response, ImageResponse):
+            self.signal_client.send_image(
+                response.image_data, caption=response.caption, recipient=recipient,
+            )
+        else:
+            self.signal_client.send_dm(response, recipient)
+        self.logger.info("DM reply to %s: %s", msg.sender, msg.text[:50])
 
     def _trim_processed_timestamps(self) -> None:
         """Trim the processed timestamps set to prevent memory growth."""
@@ -762,6 +833,12 @@ class Bridge:
         self.logger.info("FRM API: %s", self.config.frm_api_url)
         if self.server_client:
             self.logger.info("Server API: %s", self.config.server_api_url)
+        if self.grafana_client:
+            self.logger.info(
+                "Grafana: %s (%d panels)",
+                self.config.grafana_url,
+                len(self.config.grafana_panels),
+            )
         self.logger.info("Group ID: %s", self.config.signal_group_id or "(none - DM only mode)")
         self.logger.info("Poll interval: %s seconds", self.config.poll_interval)
 

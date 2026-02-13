@@ -5,8 +5,9 @@ from unittest.mock import MagicMock
 
 from config import Config
 from frm_client import FRMClient, Player, PowerStats
+from grafana_client import GrafanaClient
 from server_api_client import ServerAPIClient, SessionInfo
-from main import CommandHandler
+from main import CommandHandler, ImageResponse
 
 
 @pytest.fixture
@@ -692,3 +693,103 @@ class TestCmdConnect:
         result = handler.cmd_connect("")
 
         assert "not configured" in result.lower()
+
+
+class TestCmdGraph:
+    """Tests for graph command."""
+
+    @pytest.fixture
+    def mock_grafana(self):
+        """Create a mock Grafana client."""
+        grafana = MagicMock(spec=GrafanaClient)
+        grafana.get_panel_names.return_value = ["electricity", "power", "production"]
+        grafana.default_time_range = "6h"
+        return grafana
+
+    @pytest.fixture
+    def handler_with_grafana(self, mock_frm, config, mock_server, mock_grafana):
+        """Create a CommandHandler with Grafana client."""
+        return CommandHandler(mock_frm, config, mock_server, mock_grafana)
+
+    def test_graph_not_configured(self, handler):
+        """Test graph when Grafana not configured."""
+        result = handler.cmd_graph("")
+        assert "not configured" in result.lower()
+
+    def test_graph_list_no_args(self, handler_with_grafana, mock_grafana):
+        """Test graph with no args lists available panels."""
+        result = handler_with_grafana.cmd_graph("")
+        assert "Available graphs:" in result
+        assert "power" in result
+        assert "production" in result
+        assert "electricity" in result
+
+    def test_graph_list_explicit(self, handler_with_grafana):
+        """Test graph list subcommand."""
+        result = handler_with_grafana.cmd_graph("list")
+        assert "Available graphs:" in result
+
+    def test_graph_render_success(self, handler_with_grafana, mock_grafana):
+        """Test successful graph render returns ImageResponse."""
+        mock_grafana.render_panel.return_value = b"fake-png-data"
+
+        result = handler_with_grafana.cmd_graph("power")
+
+        assert isinstance(result, ImageResponse)
+        assert result.image_data == b"fake-png-data"
+        assert "power" in result.caption
+        mock_grafana.render_panel.assert_called_once_with("power", time_range=None)
+
+    def test_graph_render_with_time_range(self, handler_with_grafana, mock_grafana):
+        """Test graph render with custom time range."""
+        mock_grafana.render_panel.return_value = b"fake-png-data"
+
+        result = handler_with_grafana.cmd_graph("power 24h")
+
+        assert isinstance(result, ImageResponse)
+        assert "24h" in result.caption
+        mock_grafana.render_panel.assert_called_once_with("power", time_range="24h")
+
+    def test_graph_unknown_panel(self, handler_with_grafana, mock_grafana):
+        """Test graph with unknown panel name."""
+        result = handler_with_grafana.cmd_graph("nonexistent")
+
+        assert "Unknown graph" in result
+        assert "power" in result  # Should suggest available panels
+
+    def test_graph_render_failure(self, handler_with_grafana, mock_grafana):
+        """Test graph when render fails."""
+        mock_grafana.render_panel.return_value = None
+
+        result = handler_with_grafana.cmd_graph("power")
+
+        assert isinstance(result, str)
+        assert "Failed to render" in result
+
+    def test_graph_no_panels_configured(self, mock_frm, config, mock_server):
+        """Test graph when no panels configured."""
+        mock_grafana = MagicMock(spec=GrafanaClient)
+        mock_grafana.get_panel_names.return_value = []
+        handler = CommandHandler(mock_frm, config, mock_server, mock_grafana)
+
+        result = handler.cmd_graph("")
+
+        assert "No Grafana panels configured" in result
+
+    def test_graph_via_handle(self, handler_with_grafana, mock_grafana):
+        """Test graph command through main handle method."""
+        mock_grafana.render_panel.return_value = b"image-data"
+
+        result = handler_with_grafana.handle("/graph power")
+
+        assert isinstance(result, ImageResponse)
+
+    def test_help_includes_graph_when_configured(self, handler_with_grafana):
+        """Test help output includes graph command when Grafana is configured."""
+        result = handler_with_grafana.cmd_help("")
+        assert "graph" in result
+
+    def test_help_excludes_graph_when_not_configured(self, handler):
+        """Test help output excludes graph when Grafana not configured."""
+        result = handler.cmd_help("")
+        assert "graph" not in result
