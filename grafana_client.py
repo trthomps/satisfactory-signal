@@ -1,4 +1,8 @@
-"""Grafana API client for rendering dashboard panel images."""
+"""Grafana API client for rendering dashboard panel images.
+
+Requires the Grafana Image Renderer remote rendering service:
+https://github.com/grafana/grafana-image-renderer
+"""
 
 import logging
 from typing import Optional
