@@ -649,11 +649,15 @@ class Bridge:
                 player_name = msg.sender
                 if player_name in self._pending_leaves:
                     del self._pending_leaves[player_name]
-                    self.signal_client.send_to_group(f"[Server] {player_name} left the game")
+                    await asyncio.to_thread(
+                        self.signal_client.send_to_group, f"[Server] {player_name} left the game"
+                    )
                     self.logger.info("Player left: %s (confirmed by system)", player_name)
                 elif player_name in self._pending_joins:
                     del self._pending_joins[player_name]
-                    self.signal_client.send_to_group(f"[Server] {player_name} joined the game")
+                    await asyncio.to_thread(
+                        self.signal_client.send_to_group, f"[Server] {player_name} joined the game"
+                    )
                     self.logger.info("Player joined: %s (confirmed by system)", player_name)
                 else:
                     self.logger.debug(
@@ -662,7 +666,7 @@ class Bridge:
                 continue
 
             formatted = self._format_game_message(msg.sender, msg.message, msg.message_type)
-            self.signal_client.send_to_group(formatted)
+            await asyncio.to_thread(self.signal_client.send_to_group, formatted)
             self.logger.info("Game -> Signal: %s", formatted)
 
     async def poll_player_events(self) -> None:
@@ -692,7 +696,9 @@ class Bridge:
             was_dead = self._player_states.get(pid, False)
             if is_dead and not was_dead:
                 name = current_names.get(pid, "Unknown")
-                self.signal_client.send_to_group(f"[Server] {name} died")
+                await asyncio.to_thread(
+                    self.signal_client.send_to_group, f"[Server] {name} died"
+                )
                 self.logger.info("Player died: %s", name)
 
         # Check for joins (skip if player was dead - they're just respawning)
@@ -732,12 +738,16 @@ class Bridge:
         for name in list(self._pending_leaves):
             if now - self._pending_leaves[name] >= _DEBOUNCE_SECONDS:
                 del self._pending_leaves[name]
-                self.signal_client.send_to_group(f"[Server] {name} left the game")
+                await asyncio.to_thread(
+                    self.signal_client.send_to_group, f"[Server] {name} left the game"
+                )
                 self.logger.info("Player left: %s (timeout)", name)
         for name in list(self._pending_joins):
             if now - self._pending_joins[name] >= _DEBOUNCE_SECONDS:
                 del self._pending_joins[name]
-                self.signal_client.send_to_group(f"[Server] {name} joined the game")
+                await asyncio.to_thread(
+                    self.signal_client.send_to_group, f"[Server] {name} joined the game"
+                )
                 self.logger.info("Player joined: %s (timeout)", name)
 
     async def poll_power_events(self) -> None:
@@ -756,12 +766,16 @@ class Bridge:
 
         # Check for power outage (fuse tripped)
         if power.fuse_triggered and not self._fuse_triggered:
-            self.signal_client.send_to_group("[Server] Power outage! Fuse has tripped")
+            await asyncio.to_thread(
+                self.signal_client.send_to_group, "[Server] Power outage! Fuse has tripped"
+            )
             self.logger.info("Power outage detected")
 
         # Check for power restored
         elif not power.fuse_triggered and self._fuse_triggered:
-            self.signal_client.send_to_group("[Server] Power restored")
+            await asyncio.to_thread(
+                self.signal_client.send_to_group, "[Server] Power restored"
+            )
             self.logger.info("Power restored")
 
         self._fuse_triggered = power.fuse_triggered
@@ -780,10 +794,14 @@ class Bridge:
 
         # Check for state change
         if is_online and not self._server_online:
-            self.signal_client.send_to_group("[Server] Game server is back online")
+            await asyncio.to_thread(
+                self.signal_client.send_to_group, "[Server] Game server is back online"
+            )
             self.logger.info("Server came online")
         elif not is_online and self._server_online:
-            self.signal_client.send_to_group("[Server] Game server went offline")
+            await asyncio.to_thread(
+                self.signal_client.send_to_group, "[Server] Game server went offline"
+            )
             self.logger.info("Server went offline")
 
         self._server_online = is_online
@@ -811,15 +829,19 @@ class Bridge:
         """Handle a message from the Signal group."""
         # Send read receipt
         if msg.sender_uuid:
-            self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
+            await asyncio.to_thread(
+                self.signal_client.send_read_receipt, msg.sender_uuid, msg.timestamp
+            )
 
         # Check if it's a command (starts with /)
         if msg.text and msg.text.startswith("/"):
             response = await asyncio.to_thread(self.command_handler.handle, msg.text)
             if isinstance(response, ImageResponse):
-                self.signal_client.send_image(response.image_data, caption=response.caption)
+                await asyncio.to_thread(
+                    self.signal_client.send_image, response.image_data, caption=response.caption
+                )
             else:
-                self.signal_client.send_to_group(response)
+                await asyncio.to_thread(self.signal_client.send_to_group, response)
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
             return
 
@@ -859,18 +881,21 @@ class Bridge:
 
         # Send read receipt
         if msg.sender_uuid:
-            self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
+            await asyncio.to_thread(
+                self.signal_client.send_read_receipt, msg.sender_uuid, msg.timestamp
+            )
 
         response = await asyncio.to_thread(self.command_handler.handle, msg.text)
 
         # Reply to the sender
         recipient = msg.sender_uuid or msg.sender
         if isinstance(response, ImageResponse):
-            self.signal_client.send_image(
+            await asyncio.to_thread(
+                self.signal_client.send_image,
                 response.image_data, caption=response.caption, recipient=recipient,
             )
         else:
-            self.signal_client.send_dm(response, recipient)
+            await asyncio.to_thread(self.signal_client.send_dm, response, recipient)
         self.logger.info("DM reply to %s: %s", msg.sender, msg.text[:50])
 
     def _trim_processed_timestamps(self) -> None:
@@ -899,8 +924,10 @@ class Bridge:
         self.logger.info("Poll interval: %s seconds", self.config.poll_interval)
 
         # Check API connectivity
-        signal_ok = self.signal_client.health_check()
-        frm_ok = self.frm_client.health_check()
+        signal_ok, frm_ok = await asyncio.gather(
+            asyncio.to_thread(self.signal_client.health_check),
+            asyncio.to_thread(self.frm_client.health_check),
+        )
 
         if not signal_ok:
             self.logger.warning("Signal API is not reachable - will retry during operation")
@@ -908,7 +935,7 @@ class Bridge:
             self.logger.warning("FRM API is not reachable - will retry during operation")
 
         # Initialize FRM timestamp to avoid replaying old messages
-        self.frm_client.initialize_timestamp()
+        await asyncio.to_thread(self.frm_client.initialize_timestamp)
 
         self.logger.info("Bridge started, polling for messages...")
 
