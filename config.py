@@ -8,6 +8,15 @@ from dotenv import load_dotenv
 
 
 @dataclass
+class GrafanaPanel:
+    """Represents a single Grafana panel to render."""
+
+    name: str
+    dashboard_uid: str
+    panel_id: int
+
+
+@dataclass
 class Config:
     """Bot configuration loaded from environment variables."""
 
@@ -35,6 +44,14 @@ class Config:
     server_port: int = 7777
     server_password: str = ""
 
+    # Grafana settings (optional - for /graph command)
+    grafana_url: str = ""
+    grafana_api_key: str = ""
+    grafana_panels: list[GrafanaPanel] = field(default_factory=list)
+    grafana_default_width: int = 800
+    grafana_default_height: int = 400
+    grafana_default_time_range: str = "6h"
+
     @classmethod
     def from_env(cls) -> "Config":
         """Load configuration from environment variables."""
@@ -44,6 +61,21 @@ class Config:
         recipients = [r.strip() for r in recipients_str.split(",") if r.strip()]
 
         group_id = os.getenv("SIGNAL_GROUP_ID", "").strip() or None
+
+        # Parse Grafana panels: "name:dashboard_uid:panel_id,name2:uid2:id2"
+        panels: list[GrafanaPanel] = []
+        panels_str = os.getenv("GRAFANA_PANELS", "")
+        for entry in panels_str.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            parts = entry.split(":")
+            if len(parts) == 3:
+                panels.append(GrafanaPanel(
+                    name=parts[0].strip(),
+                    dashboard_uid=parts[1].strip(),
+                    panel_id=int(parts[2].strip()),
+                ))
 
         return cls(
             signal_api_url=os.getenv("SIGNAL_API_URL", "http://localhost:8080"),
@@ -60,6 +92,12 @@ class Config:
             server_host=os.getenv("SERVER_HOST", ""),
             server_port=int(os.getenv("SERVER_PORT", "7777")),
             server_password=os.getenv("SERVER_PASSWORD", ""),
+            grafana_url=os.getenv("GRAFANA_URL", ""),
+            grafana_api_key=os.getenv("GRAFANA_API_KEY", ""),
+            grafana_panels=panels,
+            grafana_default_width=int(os.getenv("GRAFANA_DEFAULT_WIDTH", "800")),
+            grafana_default_height=int(os.getenv("GRAFANA_DEFAULT_HEIGHT", "400")),
+            grafana_default_time_range=os.getenv("GRAFANA_DEFAULT_TIME_RANGE", "6h"),
         )
 
     def validate(self) -> list[str]:

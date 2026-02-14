@@ -1,6 +1,7 @@
 """Signal API client wrapper with websocket support for json-rpc mode."""
 
 import asyncio
+import base64
 import json
 import logging
 from dataclasses import dataclass, field
@@ -116,6 +117,58 @@ class SignalClient:
     def send_dm(self, text: str, recipient: str) -> bool:
         """Send a direct message to a specific recipient (UUID or username)."""
         return self.send_message(text, recipient=recipient)
+
+    def send_image(
+        self,
+        image_data: bytes,
+        caption: str = "",
+        group_id: Optional[str] = None,
+        recipient: Optional[str] = None,
+    ) -> bool:
+        """Send an image as a base64-encoded attachment.
+
+        Args:
+            image_data: Raw PNG image bytes.
+            caption: Optional text caption to send with the image.
+            group_id: Group to send to (defaults to configured group).
+            recipient: Individual recipient (overrides group).
+
+        Returns:
+            True if sent successfully.
+        """
+        if recipient:
+            recipients = [recipient]
+        elif group_id:
+            recipients = [group_id]
+        elif self.group_id:
+            recipients = [self.group_id]
+        else:
+            logger.warning("No recipient or group specified for image")
+            return False
+
+        encoded = base64.b64encode(image_data).decode("utf-8")
+        b64_attachment = f"data:image/png;filename=graph.png;base64,{encoded}"
+
+        payload: dict[str, Any] = {
+            "number": self.phone_number,
+            "recipients": recipients,
+            "base64_attachments": [b64_attachment],
+        }
+        if caption:
+            payload["message"] = caption
+
+        try:
+            response = self._session.post(
+                f"{self.api_url}/v2/send",
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+            logger.debug("Sent image attachment (%d bytes)", len(image_data))
+            return True
+        except Exception as e:
+            logger.error("Failed to send image: %s", e)
+            return False
 
     async def receive_messages_ws(self, timeout: float = 5.0) -> list[SignalMessage]:
         """Receive messages via websocket (for json-rpc mode)."""
