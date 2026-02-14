@@ -3,8 +3,10 @@
 
 import asyncio
 import logging
+import re
 import signal
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Optional, Union
@@ -17,6 +19,14 @@ from grafana_client import GrafanaClient
 from server_api_client import ServerAPIClient
 from signal_client import SignalClient, SignalMessage
 from text_processing import process_game_to_signal, process_signal_to_game
+
+# Pattern to match System chat messages for player join/leave events.
+# These are handled by debounced poll_player_events() instead of being forwarded directly.
+_SYSTEM_JOIN_LEAVE_RE = re.compile(r"has (joined|left|entered) the game", re.IGNORECASE)
+
+# Seconds to wait before announcing a join/leave if no System message confirms it.
+# Filters out camera mode / photo mode false positives (brief offline/online transitions).
+_DEBOUNCE_SECONDS = 60
 
 
 @dataclass
@@ -582,11 +592,20 @@ class Bridge:
         self._online_players: set[str] = set()  # player_ids currently online
         self._players_initialized: bool = False
 
+        # Debounce join/leave events to filter camera mode false positives
+        self._pending_leaves: dict[str, float] = {}  # player_name -> monotonic timestamp
+        self._pending_joins: dict[str, float] = {}  # player_name -> monotonic timestamp
+
         # Track power state for outage notifications
         self._fuse_triggered: Optional[bool] = None
 
         # Track server online state (None = not yet initialized)
         self._server_online: Optional[bool] = None
+
+    @staticmethod
+    def _is_system_join_leave(message: str) -> bool:
+        """Check if a System message is a player join/leave notification."""
+        return bool(_SYSTEM_JOIN_LEAVE_RE.search(message))
 
     def _format_game_message(self, sender: str, message: str, msg_type: str) -> str:
         """Format a game message for Signal."""
@@ -622,6 +641,23 @@ class Bridge:
             msg_key = f"{msg.sender}:{msg.message}"
             if msg_key in self._sent_to_game:
                 self._sent_to_game.discard(msg_key)
+                continue
+
+            # Use System join/leave messages to confirm pending events (don't forward directly)
+            if msg.message_type == "System" and self._is_system_join_leave(msg.message):
+                player_name = msg.sender
+                if player_name in self._pending_leaves:
+                    del self._pending_leaves[player_name]
+                    self.signal_client.send_to_group(f"[Server] {player_name} left the game")
+                    self.logger.info("Player left: %s (confirmed by system)", player_name)
+                elif player_name in self._pending_joins:
+                    del self._pending_joins[player_name]
+                    self.signal_client.send_to_group(f"[Server] {player_name} joined the game")
+                    self.logger.info("Player joined: %s (confirmed by system)", player_name)
+                else:
+                    self.logger.debug(
+                        "Suppressed system join/leave (no pending event): %s", msg.message
+                    )
                 continue
 
             formatted = self._format_game_message(msg.sender, msg.message, msg.message_type)
@@ -666,8 +702,13 @@ class Bridge:
                 self.logger.debug("Skipping join for respawning player: %s", pid)
                 continue
             name = current_names.get(pid, "Unknown")
-            self.signal_client.send_to_group(f"[Server] {name} joined the game")
-            self.logger.info("Player joined: %s", name)
+            # If player was pending leave, cancel it (camera mode / brief disconnect)
+            if name in self._pending_leaves:
+                del self._pending_leaves[name]
+                self.logger.debug("Cancelled pending leave (camera mode?): %s", name)
+            else:
+                self._pending_joins[name] = time.monotonic()
+                self.logger.debug("Pending join: %s", name)
 
         # Check for leaves (skip if player is dead - they're just respawning)
         left = self._online_players - current_online
@@ -677,13 +718,26 @@ class Bridge:
                 self.logger.debug("Skipping leave for dead player: %s", pid)
                 continue
             name = self._player_names.get(pid, "Unknown")
-            self.signal_client.send_to_group(f"[Server] {name} left the game")
-            self.logger.info("Player left: %s", name)
+            self._pending_leaves[name] = time.monotonic()
+            self.logger.debug("Pending leave: %s", name)
 
         # Update state
         self._online_players = current_online
         self._player_states = current_states
         self._player_names.update(current_names)
+
+        # Announce pending events that have timed out (System message was missed)
+        now = time.monotonic()
+        for name in list(self._pending_leaves):
+            if now - self._pending_leaves[name] >= _DEBOUNCE_SECONDS:
+                del self._pending_leaves[name]
+                self.signal_client.send_to_group(f"[Server] {name} left the game")
+                self.logger.info("Player left: %s (timeout)", name)
+        for name in list(self._pending_joins):
+            if now - self._pending_joins[name] >= _DEBOUNCE_SECONDS:
+                del self._pending_joins[name]
+                self.signal_client.send_to_group(f"[Server] {name} joined the game")
+                self.logger.info("Player joined: %s (timeout)", name)
 
     async def poll_power_events(self) -> None:
         """Poll for power outage events and notify Signal group."""
@@ -858,11 +912,11 @@ class Bridge:
 
         while not shutdown_event.is_set():
             try:
-                # Poll game chat (only if group configured)
-                await self.poll_game_chat()
-
-                # Poll player events (join/leave/death)
+                # Poll player events first (creates pending join/leave events)
                 await self.poll_player_events()
+
+                # Poll game chat (confirms pending events via System messages)
+                await self.poll_game_chat()
 
                 # Poll power events (outage/restore)
                 await self.poll_power_events()
