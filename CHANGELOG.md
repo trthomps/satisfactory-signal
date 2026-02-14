@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/trthomps/satisfactory-signal/compare/v0.4.2...v0.5.0) (2026-02-14)
+
+
+### Features
+
+* add Grafana graph rendering via /graph command ([#13](https://github.com/trthomps/satisfactory-signal/issues/13)) ([a0aa0b2](https://github.com/trthomps/satisfactory-signal/commit/a0aa0b2a811dded9db49b067879d97d81d058262))
+
+
+### Bug Fixes
+
+* debounce player join/leave to eliminate duplicates and camera mode spam ([#15](https://github.com/trthomps/satisfactory-signal/issues/15)) ([a7ee3b5](https://github.com/trthomps/satisfactory-signal/commit/a7ee3b58e22a7c50011101b4509f549c6e95e97f))
+
 ## [0.4.2](https://github.com/trthomps/satisfactory-signal/compare/v0.4.1...v0.4.2) (2026-02-06)
 
 
