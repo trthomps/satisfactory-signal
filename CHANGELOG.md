@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/trthomps/satisfactory-signal/compare/v0.5.0...v0.5.1) (2026-02-14)
+
+
+### Bug Fixes
+
+* make FRM client timeout configurable and polling loop non-blocking ([#16](https://github.com/trthomps/satisfactory-signal/issues/16)) ([6e367c1](https://github.com/trthomps/satisfactory-signal/commit/6e367c12c06a331aff52f776b73355470c19a79b))
+
 ## [0.5.0](https://github.com/trthomps/satisfactory-signal/compare/v0.4.2...v0.5.0) (2026-02-14)
 
 
