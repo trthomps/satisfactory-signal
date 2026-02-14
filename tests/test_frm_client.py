@@ -19,9 +19,20 @@ class TestFRMClientInit:
 
         assert client.api_url == "http://localhost:8082"
         assert client.access_token == "test-token"
+        assert client.timeout == 10.0
         assert client.last_timestamp == 0.0
         assert client._is_online is False
         assert client._last_error == ""
+
+    def test_init_custom_timeout(self):
+        """Test initialization with custom timeout."""
+        client = FRMClient(
+            api_url="http://localhost:8082",
+            access_token="test-token",
+            timeout=15.0,
+        )
+
+        assert client.timeout == 15.0
 
     def test_init_strips_trailing_slash(self):
         """Test trailing slash is stripped from URL."""
@@ -138,7 +149,25 @@ class TestFRMClientGet:
         assert client._is_online is True
         client._session.get.assert_called_with(
             "http://localhost:8082/testEndpoint",
-            timeout=5,
+            timeout=10.0,
+        )
+
+    def test_get_uses_custom_timeout(self):
+        """Test _get() uses custom timeout value."""
+        client = FRMClient("http://localhost:8082", "token", timeout=20.0)
+        client._session = MagicMock()
+        client._is_online = True
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"data": "test"}
+        mock_response.raise_for_status = MagicMock()
+        client._session.get.return_value = mock_response
+
+        client._get("testEndpoint")
+
+        client._session.get.assert_called_with(
+            "http://localhost:8082/testEndpoint",
+            timeout=20.0,
         )
 
     def test_get_connection_error(self):

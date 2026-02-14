@@ -46,9 +46,10 @@ class PowerStats:
 class FRMClient:
     """Wrapper for FRM API interactions."""
 
-    def __init__(self, api_url: str, access_token: str):
+    def __init__(self, api_url: str, access_token: str, timeout: float = 10.0):
         self.api_url = api_url.rstrip("/")
         self.access_token = access_token
+        self.timeout = timeout
         self.last_timestamp: float = 0.0
         self._session = requests.Session()
         self._session.headers.update({"Content-Type": "application/json"})
@@ -78,7 +79,7 @@ class FRMClient:
         try:
             response = self._session.get(
                 f"{self.api_url}/getChatMessages",
-                timeout=5,
+                timeout=self.timeout,
             )
             if response.status_code == 200:
                 data = response.json()
@@ -101,7 +102,7 @@ class FRMClient:
         try:
             response = self._session.get(
                 f"{self.api_url}/{endpoint}",
-                timeout=5,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             self._set_online(True)
@@ -174,7 +175,7 @@ class FRMClient:
                 f"{self.api_url}/sendChatMessage",
                 json=payload,
                 headers={"X-FRM-Authorization": self.access_token},
-                timeout=10,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             data = response.json()
