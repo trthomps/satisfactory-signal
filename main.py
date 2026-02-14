@@ -552,6 +552,7 @@ class Bridge:
         self.frm_client = FRMClient(
             api_url=config.frm_api_url,
             access_token=config.frm_access_token,
+            timeout=config.frm_timeout,
         )
 
         # Server API client (optional)
@@ -627,7 +628,7 @@ class Bridge:
         if not self.config.signal_group_id:
             return
 
-        messages = self.frm_client.get_chat_messages()
+        messages = await asyncio.to_thread(self.frm_client.get_chat_messages)
         if not messages and not self.frm_client.is_online:
             # Server offline, skip silently
             return
@@ -669,7 +670,7 @@ class Bridge:
         if not self.config.signal_group_id:
             return
 
-        players = self.frm_client.get_players()
+        players = await asyncio.to_thread(self.frm_client.get_players)
         if not players and not self.frm_client.is_online:
             return
 
@@ -744,7 +745,7 @@ class Bridge:
         if not self.config.signal_group_id:
             return
 
-        power = self.frm_client.get_power()
+        power = await asyncio.to_thread(self.frm_client.get_power)
         if not power:
             return
 
@@ -814,7 +815,7 @@ class Bridge:
 
         # Check if it's a command (starts with /)
         if msg.text and msg.text.startswith("/"):
-            response = self.command_handler.handle(msg.text)
+            response = await asyncio.to_thread(self.command_handler.handle, msg.text)
             if isinstance(response, ImageResponse):
                 self.signal_client.send_image(response.image_data, caption=response.caption)
             else:
@@ -845,7 +846,8 @@ class Bridge:
             for key in to_remove:
                 self._sent_to_game.discard(key)
 
-        self.frm_client.send_chat_message(
+        await asyncio.to_thread(
+            self.frm_client.send_chat_message,
             message=processed_text,
             sender=msg.sender,
         )
@@ -859,7 +861,7 @@ class Bridge:
         if msg.sender_uuid:
             self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
-        response = self.command_handler.handle(msg.text)
+        response = await asyncio.to_thread(self.command_handler.handle, msg.text)
 
         # Reply to the sender
         recipient = msg.sender_uuid or msg.sender
@@ -912,16 +914,16 @@ class Bridge:
 
         while not shutdown_event.is_set():
             try:
-                # Poll player events first (creates pending join/leave events)
-                await self.poll_player_events()
+                # Run independent FRM polls concurrently (player + power don't share state)
+                await asyncio.gather(
+                    self.poll_player_events(),
+                    self.poll_power_events(),
+                )
 
-                # Poll game chat (confirms pending events via System messages)
+                # Game chat depends on pending join/leave state from player events
                 await self.poll_game_chat()
 
-                # Poll power events (outage/restore)
-                await self.poll_power_events()
-
-                # Check server online status
+                # Server status reads is_online set by FRM calls above
                 await self.poll_server_status()
 
                 # Poll Signal messages (handles both group and DM)

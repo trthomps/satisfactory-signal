@@ -52,6 +52,7 @@ def mock_frm_client():
         client = FRMClient.__new__(FRMClient)
         client.api_url = "http://localhost:8082"
         client.access_token = "test-token"
+        client.timeout = 10.0
         client.last_timestamp = 0.0
         client._session = MagicMock()
         client._is_online = True

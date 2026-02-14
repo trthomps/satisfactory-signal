@@ -29,6 +29,7 @@ class Config:
     # FRM API settings
     frm_api_url: str = "http://localhost:8082"
     frm_access_token: str = ""
+    frm_timeout: float = 10.0
 
     # Dedicated Server API settings
     server_api_url: str = ""
@@ -84,6 +85,7 @@ class Config:
             signal_recipients=recipients,
             frm_api_url=os.getenv("FRM_API_URL", "http://localhost:8082"),
             frm_access_token=os.getenv("FRM_ACCESS_TOKEN", ""),
+            frm_timeout=float(os.getenv("FRM_TIMEOUT", "10.0")),
             server_api_url=os.getenv("SERVER_API_URL", ""),
             server_api_token=os.getenv("SERVER_API_TOKEN", ""),
             poll_interval=float(os.getenv("POLL_INTERVAL", "2.0")),

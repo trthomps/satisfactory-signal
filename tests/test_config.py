@@ -112,9 +112,18 @@ class TestConfigFromEnv:
         assert config.signal_api_url == "http://localhost:8080"
         assert config.signal_phone_number == "+1234567890"
         assert config.frm_api_url == "http://localhost:8082"
+        assert config.frm_timeout == 10.0
         assert config.poll_interval == 2.0
         assert config.log_level == "INFO"
         assert config.bot_name == "SignalBot"
+
+    def test_from_env_frm_timeout(self):
+        """Test FRM_TIMEOUT is loaded from environment."""
+        env_vars = {"FRM_TIMEOUT": "15.0"}
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = Config.from_env()
+        assert config.frm_timeout == 15.0
+        assert isinstance(config.frm_timeout, float)
 
     def test_from_env_empty_group_id_is_none(self):
         """Test that empty SIGNAL_GROUP_ID results in None."""
