@@ -1,7 +1,7 @@
 """Pytest fixtures and configuration for satisfactory-signal tests."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from config import Config
 from frm_client import FRMClient, ChatMessage, Player, PowerStats
@@ -41,7 +41,7 @@ def mock_signal_client():
         client.group_id = "group.dGVzdGdyb3VwaWQ="
         client._internal_group_id = "testgroupid"
         client._ws_url = "ws://localhost:8080"
-        client._session = MagicMock()
+        client._client = AsyncMock()
         return client
 
 
@@ -54,7 +54,7 @@ def mock_frm_client():
         client.access_token = "test-token"
         client.timeout = 10.0
         client.last_timestamp = 0.0
-        client._session = MagicMock()
+        client._client = AsyncMock()
         client._is_online = True
         client._last_error = ""
         return client
@@ -67,7 +67,7 @@ def mock_server_client():
         client = ServerAPIClient.__new__(ServerAPIClient)
         client.api_url = "https://localhost:7777"
         client.api_token = "test-token"
-        client._session = MagicMock()
+        client._client = AsyncMock()
         return client
 
 

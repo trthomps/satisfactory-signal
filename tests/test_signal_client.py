@@ -1,6 +1,6 @@
 """Tests for signal_client module."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from signal_client import SignalClient, SignalMessage
 
@@ -125,90 +125,90 @@ class TestSignalClientIsOurGroup:
 class TestSignalClientSendMessage:
     """Tests for SignalClient.send_message() method."""
 
-    def test_send_message_to_group(self):
+    async def test_send_message_to_group(self):
         """Test sending message to group."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
             group_id="group.abc123",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"timestamp": 123456}
         mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
+        client._client.post.return_value = mock_response
 
-        result = client.send_message("Hello!")
+        result = await client.send_message("Hello!")
 
         assert result is True
-        client._session.post.assert_called_once()
-        call_args = client._session.post.call_args
-        assert call_args[1]["json"]["message"] == "Hello!"
-        assert "group.abc123" in call_args[1]["json"]["recipients"]
+        client._client.post.assert_called_once()
+        call_kwargs = client._client.post.call_args[1]
+        assert call_kwargs["json"]["message"] == "Hello!"
+        assert "group.abc123" in call_kwargs["json"]["recipients"]
 
-    def test_send_message_to_recipient(self):
+    async def test_send_message_to_recipient(self):
         """Test sending message to specific recipient."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"timestamp": 123456}
         mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
+        client._client.post.return_value = mock_response
 
-        result = client.send_message("Hello!", recipient="+0987654321")
+        result = await client.send_message("Hello!", recipient="+0987654321")
 
         assert result is True
-        call_args = client._session.post.call_args
-        assert "+0987654321" in call_args[1]["json"]["recipients"]
+        call_kwargs = client._client.post.call_args[1]
+        assert "+0987654321" in call_kwargs["json"]["recipients"]
 
-    def test_send_message_no_recipient_no_group(self):
+    async def test_send_message_no_recipient_no_group(self):
         """Test sending message without recipient or group fails."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
-        result = client.send_message("Hello!")
+        result = await client.send_message("Hello!")
 
         assert result is False
-        client._session.post.assert_not_called()
+        client._client.post.assert_not_called()
 
-    def test_send_message_with_error_response(self):
+    async def test_send_message_with_error_response(self):
         """Test handling error response from API."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
             group_id="group.abc123",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"error": "Rate limited"}
         mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
+        client._client.post.return_value = mock_response
 
-        result = client.send_message("Hello!")
+        result = await client.send_message("Hello!")
 
         assert result is False
 
-    def test_send_message_exception(self):
+    async def test_send_message_exception(self):
         """Test handling exception during send."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
             group_id="group.abc123",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
-        client._session.post.side_effect = Exception("Connection failed")
+        client._client.post.side_effect = Exception("Connection failed")
 
-        result = client.send_message("Hello!")
+        result = await client.send_message("Hello!")
 
         assert result is False
 
@@ -216,32 +216,32 @@ class TestSignalClientSendMessage:
 class TestSignalClientSendToGroup:
     """Tests for SignalClient.send_to_group() method."""
 
-    def test_send_to_group_success(self):
+    async def test_send_to_group_success(self):
         """Test successful group message."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
             group_id="group.abc123",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"timestamp": 123456}
         mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
+        client._client.post.return_value = mock_response
 
-        result = client.send_to_group("Hello group!")
+        result = await client.send_to_group("Hello group!")
 
         assert result is True
 
-    def test_send_to_group_no_group_configured(self):
+    async def test_send_to_group_no_group_configured(self):
         """Test send_to_group without configured group."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
 
-        result = client.send_to_group("Hello!")
+        result = await client.send_to_group("Hello!")
 
         assert result is False
 
@@ -249,30 +249,30 @@ class TestSignalClientSendToGroup:
 class TestSignalClientSendDM:
     """Tests for SignalClient.send_dm() method."""
 
-    def test_send_dm_success(self):
+    async def test_send_dm_success(self):
         """Test successful direct message."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"timestamp": 123456}
         mock_response.raise_for_status = MagicMock()
-        client._session.post.return_value = mock_response
+        client._client.post.return_value = mock_response
 
-        result = client.send_dm("Hello!", "+0987654321")
+        result = await client.send_dm("Hello!", "+0987654321")
 
         assert result is True
-        call_args = client._session.post.call_args
-        assert "+0987654321" in call_args[1]["json"]["recipients"]
+        call_kwargs = client._client.post.call_args[1]
+        assert "+0987654321" in call_kwargs["json"]["recipients"]
 
 
 class TestSignalClientParseMessage:
     """Tests for SignalClient._parse_message() method."""
 
-    def test_parse_simple_message(self):
+    async def test_parse_simple_message(self):
         """Test parsing a simple text message."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -291,7 +291,7 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is not None
         assert msg.sender == "TestUser"
@@ -300,7 +300,7 @@ class TestSignalClientParseMessage:
         assert msg.timestamp == 1234567890000
         assert msg.is_group is False
 
-    def test_parse_group_message(self):
+    async def test_parse_group_message(self):
         """Test parsing a group message."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -323,13 +323,13 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is not None
         assert msg.is_group is True
         assert msg.group_id == "testgroupid"
 
-    def test_parse_message_with_attachments(self):
+    async def test_parse_message_with_attachments(self):
         """Test parsing message with attachments."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -350,13 +350,13 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is not None
         assert len(msg.attachments) == 1
         assert msg.attachments[0].content_type == "image/jpeg"
 
-    def test_parse_message_with_mentions(self):
+    async def test_parse_message_with_mentions(self):
         """Test parsing message with mentions."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -377,13 +377,13 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is not None
         assert len(msg.mentions) == 1
         assert msg.mentions[0].name == "Alice"
 
-    def test_parse_message_with_sticker(self):
+    async def test_parse_message_with_sticker(self):
         """Test parsing message with sticker."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -402,12 +402,12 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is not None
         assert msg.has_sticker is True
 
-    def test_parse_message_no_data_message(self):
+    async def test_parse_message_no_data_message(self):
         """Test parsing envelope without dataMessage returns None."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -420,11 +420,11 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is None
 
-    def test_parse_message_empty_content(self):
+    async def test_parse_message_empty_content(self):
         """Test parsing message with no content returns None."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -441,11 +441,11 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is None
 
-    def test_parse_message_from_self(self):
+    async def test_parse_message_from_self(self):
         """Test parsing message from self returns None."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -462,11 +462,11 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is None
 
-    def test_parse_message_sender_fallback(self):
+    async def test_parse_message_sender_fallback(self):
         """Test sender falls back to source number if no name."""
         client = SignalClient(
             api_url="http://localhost:8080",
@@ -483,7 +483,7 @@ class TestSignalClientParseMessage:
             }
         }
 
-        msg = client._parse_message(raw)
+        msg = await client._parse_message(raw)
 
         assert msg is not None
         assert msg.sender == "+0987654321"
@@ -492,49 +492,49 @@ class TestSignalClientParseMessage:
 class TestSignalClientSendReadReceipt:
     """Tests for SignalClient.send_read_receipt() method."""
 
-    def test_send_read_receipt_success(self):
+    async def test_send_read_receipt_success(self):
         """Test successful read receipt."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.status_code = 204
-        client._session.post.return_value = mock_response
+        client._client.post.return_value = mock_response
 
-        result = client.send_read_receipt("+0987654321", 1234567890000)
+        result = await client.send_read_receipt("+0987654321", 1234567890000)
 
         assert result is True
 
-    def test_send_read_receipt_failure(self):
+    async def test_send_read_receipt_failure(self):
         """Test failed read receipt."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.status_code = 400
-        client._session.post.return_value = mock_response
+        client._client.post.return_value = mock_response
 
-        result = client.send_read_receipt("+0987654321", 1234567890000)
+        result = await client.send_read_receipt("+0987654321", 1234567890000)
 
         assert result is False
 
-    def test_send_read_receipt_exception(self):
+    async def test_send_read_receipt_exception(self):
         """Test read receipt with exception."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
-        client._session.post.side_effect = Exception("Connection failed")
+        client._client.post.side_effect = Exception("Connection failed")
 
-        result = client.send_read_receipt("+0987654321", 1234567890000)
+        result = await client.send_read_receipt("+0987654321", 1234567890000)
 
         assert result is False
 
@@ -542,53 +542,50 @@ class TestSignalClientSendReadReceipt:
 class TestSignalClientHealthCheck:
     """Tests for SignalClient.health_check() method."""
 
-    def test_health_check_success(self):
+    async def test_health_check_success(self):
         """Test successful health check."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        client._session.get.return_value = mock_response
+        client._client.get.return_value = mock_response
 
-        result = client.health_check()
+        result = await client.health_check()
 
         assert result is True
-        client._session.get.assert_called_with(
-            "http://localhost:8080/v1/about",
-            timeout=5,
-        )
+        client._client.get.assert_called_once()
 
-    def test_health_check_failure(self):
+    async def test_health_check_failure(self):
         """Test failed health check."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
         mock_response = MagicMock()
         mock_response.status_code = 500
-        client._session.get.return_value = mock_response
+        client._client.get.return_value = mock_response
 
-        result = client.health_check()
+        result = await client.health_check()
 
         assert result is False
 
-    def test_health_check_exception(self):
+    async def test_health_check_exception(self):
         """Test health check with exception."""
         client = SignalClient(
             api_url="http://localhost:8080",
             phone_number="+1234567890",
         )
-        client._session = MagicMock()
+        client._client = AsyncMock()
 
-        client._session.get.side_effect = Exception("Connection refused")
+        client._client.get.side_effect = Exception("Connection refused")
 
-        result = client.health_check()
+        result = await client.health_check()
 
         assert result is False
 

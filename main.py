@@ -7,7 +7,7 @@ import re
 import signal
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Optional, Union
 
@@ -71,7 +71,7 @@ class CommandHandler:
         self.config = config
         self.server = server_client
         self.grafana = grafana_client
-        self.commands: dict[str, Callable[[str], Union[str, ImageResponse]]] = {
+        self.commands: dict[str, Callable[[str], Awaitable[Union[str, ImageResponse]]]] = {
             "help": self.cmd_help,
             "version": self.cmd_version,
             "list": self.cmd_list,
@@ -96,7 +96,7 @@ class CommandHandler:
             "graph": self.cmd_graph,
         }
 
-    def handle(self, text: str) -> Union[str, ImageResponse]:
+    async def handle(self, text: str) -> Union[str, ImageResponse]:
         """Process a command and return the response (text or image)."""
         text = text.strip()
 
@@ -110,10 +110,10 @@ class CommandHandler:
 
         # Help doesn't need server connection
         if cmd == "help":
-            return self.cmd_help(args)
+            return await self.cmd_help(args)
 
         handler = self.commands.get(cmd, self.cmd_unknown)
-        result = handler(args)
+        result = await handler(args)
 
         # If server is offline, append status (only for text responses)
         if not self.frm.is_online and cmd != "help" and isinstance(result, str):
@@ -121,7 +121,7 @@ class CommandHandler:
 
         return result
 
-    def cmd_help(self, _: str) -> str:
+    async def cmd_help(self, _: str) -> str:
         """Show available commands."""
         lines = [
             "Commands:",
@@ -149,17 +149,17 @@ class CommandHandler:
         lines.append("  version - Bridge version")
         return "\n".join(lines)
 
-    def cmd_unknown(self, args: str) -> str:
+    async def cmd_unknown(self, args: str) -> str:
         """Handle unknown commands."""
         return "Unknown command. Type 'help' for available commands."
 
-    def cmd_version(self, _: str) -> str:
+    async def cmd_version(self, _: str) -> str:
         """Show bridge version."""
         return f"Satisfactory-Signal Bridge v{__version__}"
 
-    def cmd_list(self, _: str) -> str:
+    async def cmd_list(self, _: str) -> str:
         """List online players."""
-        players = self.frm.get_players()
+        players = await self.frm.get_players()
         if not players:
             return "No players online (or FRM unavailable)"
 
@@ -169,9 +169,9 @@ class CommandHandler:
             lines.append(f"  - {p.name}{ping_str}")
         return "\n".join(lines)
 
-    def cmd_power(self, _: str) -> str:
+    async def cmd_power(self, _: str) -> str:
         """Show power grid status."""
-        power = self.frm.get_power()
+        power = await self.frm.get_power()
         if not power:
             return "Power data unavailable"
 
@@ -191,9 +191,9 @@ class CommandHandler:
 
         return "\n".join(lines)
 
-    def cmd_status(self, _: str) -> str:
+    async def cmd_status(self, _: str) -> str:
         """Show server status."""
-        session = self.frm.get_session_info()
+        session = await self.frm.get_session_info()
         if not session:
             if not self.frm.is_online:
                 return "Server: OFFLINE"
@@ -209,7 +209,7 @@ class CommandHandler:
         is_day = "Day" if session.get("IsDay", True) else "Night"
 
         # Get online player count
-        players = self.frm.get_players()
+        players = await self.frm.get_players()
         player_count = len(players)
 
         return (
@@ -219,12 +219,12 @@ class CommandHandler:
             f"Playtime: {playtime}"
         )
 
-    def cmd_session(self, _: str) -> str:
+    async def cmd_session(self, _: str) -> str:
         """Show detailed session info from dedicated server API."""
         if not self.server:
             return "Server API not configured"
 
-        info = self.server.get_session_info()
+        info = await self.server.get_session_info()
         if not info:
             return "Session info unavailable"
 
@@ -252,12 +252,12 @@ class CommandHandler:
 
         return "\n".join(lines)
 
-    def cmd_settings(self, _: str) -> str:
+    async def cmd_settings(self, _: str) -> str:
         """Show server settings."""
         if not self.server:
             return "Server API not configured"
 
-        options = self.server.get_server_options()
+        options = await self.server.get_server_options()
         if not options:
             return "Settings unavailable"
 
@@ -279,12 +279,12 @@ class CommandHandler:
 
         return "\n".join(lines)
 
-    def cmd_cheats(self, _: str) -> str:
+    async def cmd_cheats(self, _: str) -> str:
         """Show cheat/advanced settings."""
         if not self.server:
             return "Server API not configured"
 
-        settings = self.server.get_advanced_settings()
+        settings = await self.server.get_advanced_settings()
         if not settings:
             return "Cheat settings unavailable"
 
@@ -314,12 +314,12 @@ class CommandHandler:
 
         return "\n".join(lines)
 
-    def cmd_saves(self, _: str) -> str:
+    async def cmd_saves(self, _: str) -> str:
         """Show recent save files."""
         if not self.server:
             return "Server API not configured"
 
-        saves = self.server.get_saves(limit=5)
+        saves = await self.server.get_saves(limit=5)
         if not saves:
             return "No saves found"
 
@@ -348,9 +348,9 @@ class CommandHandler:
         lines.append("(* = current session)")
         return "\n".join(lines)
 
-    def cmd_factory(self, _: str) -> str:
+    async def cmd_factory(self, _: str) -> str:
         """Show factory statistics."""
-        stats = self.frm.get_factory_stats()
+        stats = await self.frm.get_factory_stats()
         if not stats:
             return "Factory data unavailable"
 
@@ -362,9 +362,9 @@ class CommandHandler:
             f"  Avg Efficiency: {stats['avg_efficiency']:.1f}%"
         )
 
-    def cmd_trains(self, _: str) -> str:
+    async def cmd_trains(self, _: str) -> str:
         """Show train status."""
-        trains = self.frm.get_trains()
+        trains = await self.frm.get_trains()
         if not trains:
             return "No trains found"
 
@@ -374,9 +374,9 @@ class CommandHandler:
             lines.append(f"  - {t['name']}: {t['status']} ({speed})")
         return "\n".join(lines)
 
-    def cmd_drones(self, _: str) -> str:
+    async def cmd_drones(self, _: str) -> str:
         """Show drone status."""
-        drones = self.frm.get_drones()
+        drones = await self.frm.get_drones()
         if not drones:
             return "No drones found"
 
@@ -385,9 +385,9 @@ class CommandHandler:
             lines.append(f"  - {d['home']} -> {d['destination']}: {d['status']}")
         return "\n".join(lines)
 
-    def cmd_vehicles(self, _: str) -> str:
+    async def cmd_vehicles(self, _: str) -> str:
         """Show vehicle status."""
-        vehicles = self.frm.get_vehicles()
+        vehicles = await self.frm.get_vehicles()
         if not vehicles:
             return "No vehicles found"
 
@@ -398,9 +398,9 @@ class CommandHandler:
             lines.append(f"  - {v['type']}: {speed} ({status})")
         return "\n".join(lines)
 
-    def cmd_generators(self, _: str) -> str:
+    async def cmd_generators(self, _: str) -> str:
         """Show power generation breakdown."""
-        gens = self.frm.get_generators()
+        gens = await self.frm.get_generators()
         if not gens:
             return "No generators found"
 
@@ -416,9 +416,9 @@ class CommandHandler:
         lines.append(f"Total: {total_producing:.0f}/{total_capacity:.0f} MW")
         return "\n".join(lines)
 
-    def cmd_storage(self, args: str) -> str:
+    async def cmd_storage(self, args: str) -> str:
         """Search storage containers."""
-        items = self.frm.get_storage_items(args)
+        items = await self.frm.get_storage_items(args)
         if not items:
             if args:
                 return f"No items matching '{args}' found in storage"
@@ -429,9 +429,9 @@ class CommandHandler:
             lines.append(f"  {item['name']}: {item['amount']:,}")
         return "\n".join(lines)
 
-    def cmd_prod(self, args: str) -> str:
+    async def cmd_prod(self, args: str) -> str:
         """Show production statistics."""
-        stats = self.frm.get_production_stats()
+        stats = await self.frm.get_production_stats()
         if not stats:
             return "No production data"
 
@@ -450,9 +450,9 @@ class CommandHandler:
             lines.append(f"  {s['name']}: {sign}{net:.1f}")
         return "\n".join(lines)
 
-    def cmd_sink(self, _: str) -> str:
+    async def cmd_sink(self, _: str) -> str:
         """Show AWESOME Sink status."""
-        sink = self.frm.get_sink_stats()
+        sink = await self.frm.get_sink_stats()
         if not sink:
             return "Sink data unavailable"
 
@@ -463,9 +463,9 @@ class CommandHandler:
             f"  Next Coupon: {sink['percent']:.1f}% ({sink['points_to_coupon']:,} points)"
         )
 
-    def cmd_switches(self, _: str) -> str:
+    async def cmd_switches(self, _: str) -> str:
         """Show power switch states."""
-        switches = self.frm.get_switches()
+        switches = await self.frm.get_switches()
         if not switches:
             return "No power switches found"
 
@@ -475,9 +475,9 @@ class CommandHandler:
             lines.append(f"  - {s['name']}: {state}")
         return "\n".join(lines)
 
-    def cmd_doggos(self, _: str) -> str:
+    async def cmd_doggos(self, _: str) -> str:
         """Show lizard doggo status."""
-        doggos = self.frm.get_doggos()
+        doggos = await self.frm.get_doggos()
         if not doggos:
             return "No lizard doggos found"
 
@@ -491,7 +491,7 @@ class CommandHandler:
                 lines.append(f"  - {name}: empty")
         return "\n".join(lines)
 
-    def cmd_graph(self, args: str) -> Union[str, ImageResponse]:
+    async def cmd_graph(self, args: str) -> Union[str, ImageResponse]:
         """Render a Grafana panel graph and return it as an image."""
         if not self.grafana:
             return "Grafana not configured"
@@ -516,14 +516,14 @@ class CommandHandler:
         if panel_name not in available:
             return f"Unknown graph '{panel_name}'. Available: {', '.join(available)}"
 
-        image_data = self.grafana.render_panel(panel_name, time_range=time_range)
+        image_data = await self.grafana.render_panel(panel_name, time_range=time_range)
         if not image_data:
             return f"Failed to render graph '{panel_name}'"
 
         caption = f"{panel_name} ({time_range or self.grafana.default_time_range})"
         return ImageResponse(image_data=image_data, caption=caption)
 
-    def cmd_connect(self, _: str) -> str:
+    async def cmd_connect(self, _: str) -> str:
         """Show server connection info."""
         if not self.config.server_host:
             return "Server connection info not configured"
@@ -628,7 +628,7 @@ class Bridge:
         if not self.config.signal_group_id:
             return
 
-        messages = await asyncio.to_thread(self.frm_client.get_chat_messages)
+        messages = await self.frm_client.get_chat_messages()
         if not messages and not self.frm_client.is_online:
             # Server offline, skip silently
             return
@@ -649,14 +649,14 @@ class Bridge:
                 player_name = msg.sender
                 if player_name in self._pending_leaves:
                     del self._pending_leaves[player_name]
-                    await asyncio.to_thread(
-                        self.signal_client.send_to_group, f"[Server] {player_name} left the game"
+                    await self.signal_client.send_to_group(
+                        f"[Server] {player_name} left the game"
                     )
                     self.logger.info("Player left: %s (confirmed by system)", player_name)
                 elif player_name in self._pending_joins:
                     del self._pending_joins[player_name]
-                    await asyncio.to_thread(
-                        self.signal_client.send_to_group, f"[Server] {player_name} joined the game"
+                    await self.signal_client.send_to_group(
+                        f"[Server] {player_name} joined the game"
                     )
                     self.logger.info("Player joined: %s (confirmed by system)", player_name)
                 else:
@@ -666,7 +666,7 @@ class Bridge:
                 continue
 
             formatted = self._format_game_message(msg.sender, msg.message, msg.message_type)
-            await asyncio.to_thread(self.signal_client.send_to_group, formatted)
+            await self.signal_client.send_to_group(formatted)
             self.logger.info("Game -> Signal: %s", formatted)
 
     async def poll_player_events(self) -> None:
@@ -674,7 +674,7 @@ class Bridge:
         if not self.config.signal_group_id:
             return
 
-        players = await asyncio.to_thread(self.frm_client.get_players)
+        players = await self.frm_client.get_players()
         if not players and not self.frm_client.is_online:
             return
 
@@ -696,9 +696,7 @@ class Bridge:
             was_dead = self._player_states.get(pid, False)
             if is_dead and not was_dead:
                 name = current_names.get(pid, "Unknown")
-                await asyncio.to_thread(
-                    self.signal_client.send_to_group, f"[Server] {name} died"
-                )
+                await self.signal_client.send_to_group(f"[Server] {name} died")
                 self.logger.info("Player died: %s", name)
 
         # Check for joins (skip if player was dead - they're just respawning)
@@ -738,15 +736,15 @@ class Bridge:
         for name in list(self._pending_leaves):
             if now - self._pending_leaves[name] >= _DEBOUNCE_SECONDS:
                 del self._pending_leaves[name]
-                await asyncio.to_thread(
-                    self.signal_client.send_to_group, f"[Server] {name} left the game"
+                await self.signal_client.send_to_group(
+                    f"[Server] {name} left the game"
                 )
                 self.logger.info("Player left: %s (timeout)", name)
         for name in list(self._pending_joins):
             if now - self._pending_joins[name] >= _DEBOUNCE_SECONDS:
                 del self._pending_joins[name]
-                await asyncio.to_thread(
-                    self.signal_client.send_to_group, f"[Server] {name} joined the game"
+                await self.signal_client.send_to_group(
+                    f"[Server] {name} joined the game"
                 )
                 self.logger.info("Player joined: %s (timeout)", name)
 
@@ -755,7 +753,7 @@ class Bridge:
         if not self.config.signal_group_id:
             return
 
-        power = await asyncio.to_thread(self.frm_client.get_power)
+        power = await self.frm_client.get_power()
         if not power:
             return
 
@@ -766,16 +764,14 @@ class Bridge:
 
         # Check for power outage (fuse tripped)
         if power.fuse_triggered and not self._fuse_triggered:
-            await asyncio.to_thread(
-                self.signal_client.send_to_group, "[Server] Power outage! Fuse has tripped"
+            await self.signal_client.send_to_group(
+                "[Server] Power outage! Fuse has tripped"
             )
             self.logger.info("Power outage detected")
 
         # Check for power restored
         elif not power.fuse_triggered and self._fuse_triggered:
-            await asyncio.to_thread(
-                self.signal_client.send_to_group, "[Server] Power restored"
-            )
+            await self.signal_client.send_to_group("[Server] Power restored")
             self.logger.info("Power restored")
 
         self._fuse_triggered = power.fuse_triggered
@@ -794,13 +790,13 @@ class Bridge:
 
         # Check for state change
         if is_online and not self._server_online:
-            await asyncio.to_thread(
-                self.signal_client.send_to_group, "[Server] Game server is back online"
+            await self.signal_client.send_to_group(
+                "[Server] Game server is back online"
             )
             self.logger.info("Server came online")
         elif not is_online and self._server_online:
-            await asyncio.to_thread(
-                self.signal_client.send_to_group, "[Server] Game server went offline"
+            await self.signal_client.send_to_group(
+                "[Server] Game server went offline"
             )
             self.logger.info("Server went offline")
 
@@ -829,19 +825,17 @@ class Bridge:
         """Handle a message from the Signal group."""
         # Send read receipt
         if msg.sender_uuid:
-            await asyncio.to_thread(
-                self.signal_client.send_read_receipt, msg.sender_uuid, msg.timestamp
-            )
+            await self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
         # Check if it's a command (starts with /)
         if msg.text and msg.text.startswith("/"):
-            response = await asyncio.to_thread(self.command_handler.handle, msg.text)
+            response = await self.command_handler.handle(msg.text)
             if isinstance(response, ImageResponse):
-                await asyncio.to_thread(
-                    self.signal_client.send_image, response.image_data, caption=response.caption
+                await self.signal_client.send_image(
+                    response.image_data, caption=response.caption
                 )
             else:
-                await asyncio.to_thread(self.signal_client.send_to_group, response)
+                await self.signal_client.send_to_group(response)
             self.logger.info("Group command from %s: %s", msg.sender, msg.text)
             return
 
@@ -868,8 +862,7 @@ class Bridge:
             for key in to_remove:
                 self._sent_to_game.discard(key)
 
-        await asyncio.to_thread(
-            self.frm_client.send_chat_message,
+        await self.frm_client.send_chat_message(
             message=processed_text,
             sender=msg.sender,
         )
@@ -881,21 +874,18 @@ class Bridge:
 
         # Send read receipt
         if msg.sender_uuid:
-            await asyncio.to_thread(
-                self.signal_client.send_read_receipt, msg.sender_uuid, msg.timestamp
-            )
+            await self.signal_client.send_read_receipt(msg.sender_uuid, msg.timestamp)
 
-        response = await asyncio.to_thread(self.command_handler.handle, msg.text)
+        response = await self.command_handler.handle(msg.text)
 
         # Reply to the sender
         recipient = msg.sender_uuid or msg.sender
         if isinstance(response, ImageResponse):
-            await asyncio.to_thread(
-                self.signal_client.send_image,
+            await self.signal_client.send_image(
                 response.image_data, caption=response.caption, recipient=recipient,
             )
         else:
-            await asyncio.to_thread(self.signal_client.send_dm, response, recipient)
+            await self.signal_client.send_dm(response, recipient)
         self.logger.info("DM reply to %s: %s", msg.sender, msg.text[:50])
 
     def _trim_processed_timestamps(self) -> None:
@@ -925,8 +915,8 @@ class Bridge:
 
         # Check API connectivity
         signal_ok, frm_ok = await asyncio.gather(
-            asyncio.to_thread(self.signal_client.health_check),
-            asyncio.to_thread(self.frm_client.health_check),
+            self.signal_client.health_check(),
+            self.frm_client.health_check(),
         )
 
         if not signal_ok:
@@ -935,7 +925,7 @@ class Bridge:
             self.logger.warning("FRM API is not reachable - will retry during operation")
 
         # Initialize FRM timestamp to avoid replaying old messages
-        await asyncio.to_thread(self.frm_client.initialize_timestamp)
+        await self.frm_client.initialize_timestamp()
 
         self.logger.info("Bridge started, polling for messages...")
 

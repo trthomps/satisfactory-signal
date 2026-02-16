@@ -7,7 +7,7 @@ https://github.com/grafana/grafana-image-renderer
 import logging
 from typing import Optional
 
-import requests
+import httpx
 
 from config import GrafanaPanel
 
@@ -31,16 +31,17 @@ class GrafanaClient:
         self.default_width = default_width
         self.default_height = default_height
         self.default_time_range = default_time_range
-        self._session = requests.Session()
-        self._session.headers.update({
-            "Authorization": f"Bearer {api_key}",
-        })
+        self._client = httpx.AsyncClient(
+            headers={
+                "Authorization": f"Bearer {api_key}",
+            },
+        )
 
     def get_panel_names(self) -> list[str]:
         """Return sorted list of available panel names."""
         return sorted(self.panels.keys())
 
-    def render_panel(
+    async def render_panel(
         self,
         panel_name: str,
         time_range: Optional[str] = None,
@@ -77,7 +78,7 @@ class GrafanaClient:
         )
 
         try:
-            response = self._session.get(url, timeout=30)
+            response = await self._client.get(url, timeout=httpx.Timeout(30))
             response.raise_for_status()
 
             if "image/png" not in response.headers.get("Content-Type", ""):
@@ -90,20 +91,23 @@ class GrafanaClient:
             logger.debug("Rendered panel '%s' (%d bytes)", panel_name, len(response.content))
             return response.content
 
-        except requests.ConnectionError:
+        except httpx.ConnectError:
             logger.error("Cannot connect to Grafana at %s", self.api_url)
             return None
-        except requests.Timeout:
+        except httpx.TimeoutException:
             logger.error("Grafana render timed out for panel '%s'", panel_name)
             return None
-        except requests.RequestException as e:
+        except httpx.HTTPStatusError as e:
             logger.error("Grafana render failed for panel '%s': %s", panel_name, e)
             return None
 
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         """Check if Grafana API is reachable."""
         try:
-            response = self._session.get(f"{self.api_url}/api/health", timeout=5)
+            response = await self._client.get(
+                f"{self.api_url}/api/health",
+                timeout=httpx.Timeout(5),
+            )
             return response.status_code == 200
         except Exception as e:
             logger.error("Grafana health check failed: %s", e)
