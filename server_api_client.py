@@ -4,11 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-import requests
-import urllib3
-
-# Suppress SSL warnings for self-signed certificates
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -34,36 +30,37 @@ class ServerAPIClient:
     def __init__(self, api_url: str, api_token: str):
         self.api_url = api_url.rstrip("/")
         self.api_token = api_token
-        self._session = requests.Session()
-        self._session.headers.update({
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_token}",
-        })
-        # Disable SSL verification for self-signed certs
-        self._session.verify = False
+        self._client = httpx.AsyncClient(
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_token}",
+            },
+            # Disable SSL verification for self-signed certs
+            verify=False,
+            timeout=httpx.Timeout(10),
+        )
 
-    def _call(self, function: str, data: Optional[dict] = None) -> Optional[dict]:
+    async def _call(self, function: str, data: Optional[dict] = None) -> Optional[dict]:
         """Make an API call to the server."""
         payload: dict = {"function": function}
         if data:
             payload["data"] = data
 
         try:
-            response = self._session.post(
+            response = await self._client.post(
                 f"{self.api_url}/api/v1",
                 json=payload,
-                timeout=10,
             )
             response.raise_for_status()
             result = response.json()
             return result.get("data")
-        except requests.RequestException as e:
+        except httpx.HTTPStatusError as e:
             logger.error("Server API request failed (%s): %s", function, e)
             return None
 
-    def get_session_info(self) -> Optional[SessionInfo]:
+    async def get_session_info(self) -> Optional[SessionInfo]:
         """Get current session information."""
-        data = self._call("QueryServerState")
+        data = await self._call("QueryServerState")
         if not data:
             return None
 
@@ -107,9 +104,9 @@ class ServerAPIClient:
             return "Complete!"
         return "Unknown"
 
-    def get_server_options(self) -> Optional[dict]:
+    async def get_server_options(self) -> Optional[dict]:
         """Get server options/settings."""
-        data = self._call("GetServerOptions")
+        data = await self._call("GetServerOptions")
         if not data:
             return None
 
@@ -125,9 +122,9 @@ class ServerAPIClient:
             "send_gameplay_data": options.get("FG.SendGameplayData", "False") == "True",
         }
 
-    def get_advanced_settings(self) -> Optional[dict]:
+    async def get_advanced_settings(self) -> Optional[dict]:
         """Get advanced game settings (cheats)."""
-        data = self._call("GetAdvancedGameSettings")
+        data = await self._call("GetAdvancedGameSettings")
         if not data:
             return None
 
@@ -149,9 +146,9 @@ class ServerAPIClient:
             "all_alt_recipes": settings.get("FG.GameRules.UnlockInstantAltRecipes", "False") == "True",
         }
 
-    def get_saves(self, limit: int = 5) -> list[dict]:
+    async def get_saves(self, limit: int = 5) -> list[dict]:
         """Get recent save files."""
-        data = self._call("EnumerateSessions")
+        data = await self._call("EnumerateSessions")
         if not data:
             return []
 
@@ -180,13 +177,13 @@ class ServerAPIClient:
 
         return saves[:limit]
 
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         """Check if server API is reachable."""
         try:
-            response = self._session.post(
+            response = await self._client.post(
                 f"{self.api_url}/api/v1",
                 json={"function": "HealthCheck", "data": {"ClientCustomData": ""}},
-                timeout=5,
+                timeout=httpx.Timeout(5),
             )
             if response.status_code == 200:
                 data = response.json()

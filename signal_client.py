@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-import requests
+import httpx
 import websockets
 
 from text_processing import Attachment, Mention, parse_attachments, parse_mentions
@@ -43,8 +43,9 @@ class SignalClient:
         self.phone_number = phone_number
         self.group_id = group_id  # Full format: group.xxx or internal format
         self._ws_url = self.api_url.replace("http://", "ws://").replace("https://", "wss://")
-        self._session = requests.Session()
-        self._session.headers.update({"Content-Type": "application/json"})
+        self._client = httpx.AsyncClient(
+            headers={"Content-Type": "application/json"},
+        )
 
         # Extract internal group ID for matching incoming messages
         self._internal_group_id: Optional[str] = None
@@ -69,7 +70,7 @@ class SignalClient:
             return False
         return incoming_group_id == self._internal_group_id
 
-    def send_message(self, text: str, group_id: Optional[str] = None, recipient: Optional[str] = None) -> bool:
+    async def send_message(self, text: str, group_id: Optional[str] = None, recipient: Optional[str] = None) -> bool:
         """Send a message to a group or individual recipient."""
         # Prioritize explicit recipient over group
         if recipient:
@@ -89,10 +90,10 @@ class SignalClient:
         }
 
         try:
-            response = self._session.post(
+            response = await self._client.post(
                 f"{self.api_url}/v2/send",
                 json=payload,
-                timeout=30,
+                timeout=httpx.Timeout(30),
             )
             response.raise_for_status()
             data = response.json()
@@ -107,18 +108,18 @@ class SignalClient:
             logger.error("Failed to send Signal message: %s", e)
             return False
 
-    def send_to_group(self, text: str) -> bool:
+    async def send_to_group(self, text: str) -> bool:
         """Send a message to the configured group."""
         if not self.group_id:
             logger.warning("No group configured")
             return False
-        return self.send_message(text, group_id=self.group_id)
+        return await self.send_message(text, group_id=self.group_id)
 
-    def send_dm(self, text: str, recipient: str) -> bool:
+    async def send_dm(self, text: str, recipient: str) -> bool:
         """Send a direct message to a specific recipient (UUID or username)."""
-        return self.send_message(text, recipient=recipient)
+        return await self.send_message(text, recipient=recipient)
 
-    def send_image(
+    async def send_image(
         self,
         image_data: bytes,
         caption: str = "",
@@ -158,10 +159,10 @@ class SignalClient:
             payload["message"] = caption
 
         try:
-            response = self._session.post(
+            response = await self._client.post(
                 f"{self.api_url}/v2/send",
                 json=payload,
-                timeout=30,
+                timeout=httpx.Timeout(30),
             )
             response.raise_for_status()
             logger.debug("Sent image attachment (%d bytes)", len(image_data))
@@ -180,7 +181,7 @@ class SignalClient:
                 while True:
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
-                        msg = self._parse_message(json.loads(raw))
+                        msg = await self._parse_message(json.loads(raw))
                         if msg:
                             messages.append(msg)
                         # Short timeout for subsequent messages
@@ -192,7 +193,7 @@ class SignalClient:
 
         return messages
 
-    def _parse_message(self, raw: dict) -> Optional[SignalMessage]:
+    async def _parse_message(self, raw: dict) -> Optional[SignalMessage]:
         """Parse a raw message envelope into a SignalMessage."""
         envelope = raw.get("envelope", {})
         data_message = envelope.get("dataMessage")
@@ -237,7 +238,7 @@ class SignalClient:
                 if mention.uuid in self._name_cache:
                     mention.name = self._name_cache[mention.uuid]
                 else:
-                    name = self.get_contact_name(mention.uuid)
+                    name = await self.get_contact_name(mention.uuid)
                     if name:
                         self._name_cache[mention.uuid] = name
                         mention.name = name
@@ -258,7 +259,7 @@ class SignalClient:
             mentions=mentions,
         )
 
-    def send_read_receipt(self, recipient: str, timestamp: int) -> bool:
+    async def send_read_receipt(self, recipient: str, timestamp: int) -> bool:
         """Send a read receipt for a message."""
         payload = {
             "receipt_type": "read",
@@ -267,10 +268,10 @@ class SignalClient:
         }
 
         try:
-            response = self._session.post(
+            response = await self._client.post(
                 f"{self.api_url}/v1/receipts/{self.phone_number}",
                 json=payload,
-                timeout=10,
+                timeout=httpx.Timeout(10),
             )
             if response.status_code == 204:
                 logger.debug("Sent read receipt to %s", recipient)
@@ -281,12 +282,12 @@ class SignalClient:
             return False
 
 
-    def get_contact_name(self, uuid: str) -> Optional[str]:
+    async def get_contact_name(self, uuid: str) -> Optional[str]:
         """Look up a contact's name by UUID from the contacts list."""
         try:
-            response = self._session.get(
+            response = await self._client.get(
                 f"{self.api_url}/v1/contacts/{self.phone_number}",
-                timeout=5,
+                timeout=httpx.Timeout(5),
             )
             if response.status_code == 200:
                 contacts = response.json()
@@ -305,10 +306,13 @@ class SignalClient:
             logger.debug("Failed to look up contact %s: %s", uuid, e)
         return None
 
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         """Check if Signal API is reachable."""
         try:
-            response = self._session.get(f"{self.api_url}/v1/about", timeout=5)
+            response = await self._client.get(
+                f"{self.api_url}/v1/about",
+                timeout=httpx.Timeout(5),
+            )
             return response.status_code == 200
         except Exception as e:
             logger.error("Signal API health check failed: %s", e)

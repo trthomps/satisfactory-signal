@@ -1,7 +1,7 @@
 """Tests for Bridge join/leave debounce logic."""
 
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -28,9 +28,12 @@ def bridge(config):
          patch.object(FRMClient, "__init__", lambda self, *a, **kw: None):
         b = Bridge(config)
         b.signal_client = MagicMock(spec=SignalClient)
-        b.signal_client.send_to_group = MagicMock(return_value=True)
+        b.signal_client.send_to_group = AsyncMock(return_value=True)
         b.frm_client = MagicMock(spec=FRMClient)
         b.frm_client.is_online = True
+        b.frm_client.get_players = AsyncMock(return_value=[])
+        b.frm_client.get_chat_messages = AsyncMock(return_value=[])
+        b.frm_client.get_power = AsyncMock(return_value=None)
         return b
 
 
@@ -80,7 +83,6 @@ class TestIsSystemJoinLeave:
 class TestDebounceJoinLeave:
     """Tests for debounced join/leave announcements in poll_player_events()."""
 
-    @pytest.mark.asyncio
     async def test_camera_mode_no_announcement(self, bridge):
         """Player leaves then returns within 60s (camera mode) -> no announcements."""
         # Initialize with player online
@@ -105,7 +107,6 @@ class TestDebounceJoinLeave:
         assert "Alice" not in bridge._pending_joins
         bridge.signal_client.send_to_group.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_real_leave_timeout(self, bridge):
         """Player leaves and doesn't return within 60s -> announce on timeout."""
         # Initialize with player online
@@ -129,7 +130,6 @@ class TestDebounceJoinLeave:
         )
         assert "Bob" not in bridge._pending_leaves
 
-    @pytest.mark.asyncio
     async def test_real_join_timeout(self, bridge):
         """New player joins and System message missed -> announce on timeout."""
         # Initialize with no players
@@ -153,7 +153,6 @@ class TestDebounceJoinLeave:
         )
         assert "Charlie" not in bridge._pending_joins
 
-    @pytest.mark.asyncio
     async def test_death_still_immediate(self, bridge):
         """Death announcements are not debounced."""
         # Initialize with player alive
@@ -168,7 +167,6 @@ class TestDebounceJoinLeave:
             "[Server] Dave died"
         )
 
-    @pytest.mark.asyncio
     async def test_new_join_not_in_pending_leaves(self, bridge):
         """A truly new player (not returning from camera mode) creates a pending join."""
         bridge.frm_client.get_players.return_value = []
@@ -184,7 +182,6 @@ class TestDebounceJoinLeave:
 class TestSystemMessageConfirmation:
     """Tests for System messages confirming pending events in poll_game_chat()."""
 
-    @pytest.mark.asyncio
     async def test_system_leave_confirms_pending(self, bridge):
         """System leave message confirms a pending leave -> immediate announce."""
         bridge._pending_leaves["Alice"] = time.monotonic()
@@ -204,7 +201,6 @@ class TestSystemMessageConfirmation:
         )
         assert "Alice" not in bridge._pending_leaves
 
-    @pytest.mark.asyncio
     async def test_system_join_confirms_pending(self, bridge):
         """System join message confirms a pending join -> immediate announce."""
         bridge._pending_joins["Bob"] = time.monotonic()
@@ -224,7 +220,6 @@ class TestSystemMessageConfirmation:
         )
         assert "Bob" not in bridge._pending_joins
 
-    @pytest.mark.asyncio
     async def test_system_join_leave_suppressed_no_pending(self, bridge):
         """System join/leave message with no matching pending event is suppressed."""
         bridge.frm_client.get_chat_messages.return_value = [
@@ -239,7 +234,6 @@ class TestSystemMessageConfirmation:
 
         bridge.signal_client.send_to_group.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_other_system_messages_forwarded(self, bridge):
         """Non-join/leave System messages are forwarded normally."""
         bridge.frm_client.get_chat_messages.return_value = [
@@ -256,7 +250,6 @@ class TestSystemMessageConfirmation:
         call_arg = bridge.signal_client.send_to_group.call_args[0][0]
         assert "[System] Autosave complete" == call_arg
 
-    @pytest.mark.asyncio
     async def test_player_messages_unaffected(self, bridge):
         """Regular player chat messages are not affected by the filter."""
         bridge.frm_client.get_chat_messages.return_value = [
@@ -273,7 +266,6 @@ class TestSystemMessageConfirmation:
         call_arg = bridge.signal_client.send_to_group.call_args[0][0]
         assert "[GamePlayer] Hello everyone!" == call_arg
 
-    @pytest.mark.asyncio
     async def test_mixed_messages_only_join_leave_handled(self, bridge):
         """In a batch, only System join/leave messages are handled specially."""
         bridge._pending_joins["NewPlayer"] = time.monotonic()
@@ -305,7 +297,6 @@ class TestSystemMessageConfirmation:
         assert "[SomePlayer] Welcome!" in calls
         assert "[System] Autosave complete" in calls
 
-    @pytest.mark.asyncio
     async def test_bot_messages_still_skipped(self, bridge):
         """Messages from the bot itself are still skipped."""
         bridge.frm_client.get_chat_messages.return_value = [
